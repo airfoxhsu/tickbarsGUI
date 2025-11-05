@@ -196,7 +196,7 @@ class AppFrame(wx.Frame):
         self.isAutoPosition = wx.CheckBox(pnl, label="定時查倉", pos=(840, 425))
         self.isAutoPosition.SetValue(False)
         self.isAutoPosition.Bind(wx.EVT_CHECKBOX, self.OnAutoPositionCheck)
-        self.position_watcher = PositionWatcher(interval=3)
+        self.position_watcher = PositionWatcher(interval=1)
 
         matquery = wx.Button(pnl, wx.ID_ANY, label='查詢',
                              pos=(1130, 420), size=(70, 25))
@@ -1407,22 +1407,34 @@ class YuantaOrdEvents(object):
     # 通用查詢 Event
 
     def OnUserDefinsFuncResult(self, this, RowCount, Results, WorkID):
-        data = dict(p.split("=") for p in Results.split("|"))
-        if frame.last_userdefine_source == "autoposition":
-            if frame.qtyLabel.GetLabel() != data["TOTAL_OFF_POSITION"]:
-                frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
-                frame.Logmessage(Results)
-        elif frame.last_userdefine_source == "userquery":
-            if WorkID == "FA001" or WorkID == "FA002":
-                frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
-                frame.Logmessage(Results)
-            elif WorkID == "FA003":
-                result = f'權益數:{data["EQUITY"]}  浮動損益:{data["FLOAT_MARGIN"]}  本日損益:{data["GRANTAL"]}'
-                frame.Logmessage(result)
-            # elif WorkID == "RA003":
-            else:
-                frame.Logmessage(Results)
-        frame.last_userdefine_source = None    
+        try:
+        # data = dict(p.split("=") for p in Results.split("|"))
+        # parts = [p.split("=") for p in Results.split("|") if "=" in p]
+        # data = dict((k, v) for k, v in parts if len((k, v)) == 2)
+            data = {}
+            for seg in Results.split("|"):
+                if "=" in seg:  # 只處理有等號的
+                    k, v = seg.split("=", 1)  # 最多分割一次，避免 value 裡也有 "="
+                    data[k] = v
+
+            if frame.last_userdefine_source == "autoposition":
+                if frame.qtyLabel.GetLabel() != data["TOTAL_OFF_POSITION"]:
+                    frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
+                    frame.Logmessage(Results)
+            elif frame.last_userdefine_source == "userquery":
+                if WorkID == "FA001" or WorkID == "FA002":
+                    frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
+                    frame.Logmessage(Results)
+                elif WorkID == "FA003":
+                    result = f'權益數:{data["EQUITY"]}  浮動損益:{data["FLOAT_MARGIN"]}  本日損益:{data["GRANTAL"]}'
+                    frame.Logmessage(result)
+                # elif WorkID == "RA003":
+                else:
+                    frame.Logmessage(Results)
+        except Exception as e:
+            frame.Logmessage(f"OnUserDefinsFuncResult error: {e}")
+        finally:
+            frame.last_userdefine_source = None           
 
     # 自動委託回報 Event
     def OnOrdRptF(self, this, Omkt, Mktt, Cmbf, Statusc, Ts_Code, Ts_Msg, Bhno, AcNo,
