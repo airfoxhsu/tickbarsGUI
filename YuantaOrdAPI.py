@@ -1348,7 +1348,6 @@ class StockBot:
 class YuantaOrdEvents(object):
     def __init__(self, parent):
         self.parent = parent
-        self.inventoryStr=''
     def OnLogonS(self, this, TLinkStatus, AccList, Casq, Cast):
         frame.Logmessage('OnLogonS {},{},{},{}'.format(
             TLinkStatus, AccList, Casq, Cast))
@@ -1362,7 +1361,10 @@ class YuantaOrdEvents(object):
             if len(Casq) != 0:
                 Bot.YuantaSN.append(Casq.split('=')[1])
             # 登入查庫存
-            frame.OnUserDefineBtn(event=None, method="庫存")
+            if frame.isAutoPosition.GetValue()==False:
+                frame.isAutoPosition.SetValue(True)
+                frame.OnAutoPositionCheck(None)
+            # frame.OnUserDefineBtn(event=None, method="庫存")
     # 手動委託回報查詢
 
     def OnReportQuery(self, this, RowCount, Results):
@@ -1400,12 +1402,8 @@ class YuantaOrdEvents(object):
     def OnUserDefinsFuncResult(self, this, RowCount, Results, WorkID):
         data = dict(p.split("=") for p in Results.split("|"))
         if frame.last_userdefine_source == "autoposition":
-            frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
-            # if self.inventoryStr=='':
-            #     self.inventoryStr=data["TOTAL_OFF_POSITION"]
-            #     frame.Logmessage(Results)
-            if self.inventoryStr != data["TOTAL_OFF_POSITION"]:
-                self.inventoryStr=data["TOTAL_OFF_POSITION"]
+            if frame.qtyLabel.GetLabel() != data["TOTAL_OFF_POSITION"]:
+                frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
                 frame.Logmessage(Results)
         elif frame.last_userdefine_source == "userquery":
             if WorkID == "FA001" or WorkID == "FA002":
@@ -1447,8 +1445,9 @@ class YuantaOrdEvents(object):
         # 檢查庫存  
         # frame.OnUserDefineBtn(event=None, method="庫存")
         # 檢查庫存  手動呼叫事件函式
-        frame.isAutoPosition.SetValue(True)
-        frame.OnAutoPositionCheck(None)
+        if frame.isAutoPosition.GetValue()==False:
+            frame.isAutoPosition.SetValue(True)
+            frame.OnAutoPositionCheck(None)
 
         msg = 'Omkt={},Buys={},Cmbf={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},S_Buys={},O_Prc={},A_Prc={},O_Qty={},Deal_Qty={},T_Date={},D_Time={},Order_No={},O_Src={},O_Lin={},Oseq_No={}'.format(Omkt.strip(), Buys.strip(), Cmbf.strip(), Bhno.strip(
         ), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), S_Buys.strip(), O_Prc.strip(), A_Prc.strip(), O_Qty.strip(), Deal_Qty.strip(), T_Date.strip(), D_Time.strip(), Order_No.strip(), O_Src.strip(), O_Lin.strip(), Oseq_No.strip())

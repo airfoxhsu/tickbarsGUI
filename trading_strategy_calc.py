@@ -863,7 +863,7 @@ class TradingStrategy:
             symbol = "TXF"
             lots = int(self.frame.lots_combo)
             threading.Thread(
-                target=auto_send_order,
+                target=self.bot.auto_send_order,
                 args=(self.frame.bot.Yuanta, symbol, side, lots),
                 daemon=True
             ).start()
