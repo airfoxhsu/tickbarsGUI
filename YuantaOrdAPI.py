@@ -1360,11 +1360,11 @@ class YuantaOrdEvents(object):
             frame.acclist_combo.SetSelection(0)
             if len(Casq) != 0:
                 Bot.YuantaSN.append(Casq.split('=')[1])
-            # 登入查庫存
-            if frame.isAutoPosition.GetValue()==False:
-                frame.isAutoPosition.SetValue(True)
-                frame.OnAutoPositionCheck(None)
-            # frame.OnUserDefineBtn(event=None, method="庫存")
+            # # 登入查庫存
+            # if frame.isAutoPosition.GetValue()==False:
+            #     frame.isAutoPosition.SetValue(True)
+            #     frame.OnAutoPositionCheck(None)
+            frame.OnUserDefineBtn(event=None, method="庫存")
     # 手動委託回報查詢
 
     def OnReportQuery(self, this, RowCount, Results):
@@ -1404,6 +1404,8 @@ class YuantaOrdEvents(object):
         if frame.last_userdefine_source == "autoposition":
             if frame.qtyLabel.GetLabel() != data["TOTAL_OFF_POSITION"]:
                 frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
+                frame.isAutoPosition.SetValue(False)
+                frame.position_watcher.stop()
                 frame.Logmessage(Results)
         elif frame.last_userdefine_source == "userquery":
             if WorkID == "FA001" or WorkID == "FA002":
@@ -1444,7 +1446,7 @@ class YuantaOrdEvents(object):
                   Oseq_No):
         # 檢查庫存  
         # frame.OnUserDefineBtn(event=None, method="庫存")
-        # 檢查庫存  手動呼叫事件函式
+        # # 檢查庫存  手動呼叫事件函式
         if frame.isAutoPosition.GetValue()==False:
             frame.isAutoPosition.SetValue(True)
             frame.OnAutoPositionCheck(None)
@@ -1601,12 +1603,13 @@ class PositionWatcher:
         """停止背景查倉執行緒"""
         if self.thread:
             self.stop_flag.set()
-            frame.qtyLabel.SetLabel("未連")
+            # frame.qtyLabel.SetLabel("0")   #未連
             frame.Logmessage("🛑 已停止自動查倉（執行緒將自行結束）")
             wx.CallLater(500, self._check_thread_done)
 
     def _check_thread_done(self):
         if self.thread and not self.thread.is_alive():
+            # frame.qtyLabel.SetLabel("0")    #未連
             frame.Logmessage("✅ 查倉執行緒已安全結束")
             self.thread = None
         else:
