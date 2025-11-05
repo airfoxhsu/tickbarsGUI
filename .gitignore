@@ -1,0 +1,6 @@
+*.log
+logs/
+*.json
+tickbarsGUI_venv/
+output/
+__pycache__/
