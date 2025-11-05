@@ -1,6 +1,6 @@
 ﻿# -*- coding: utf-8 -*-
-from math import e
-from turtle import st
+# from math import e
+# from turtle import st
 import wx
 import time
 import wx.grid
@@ -196,11 +196,15 @@ class AppFrame(wx.Frame):
         self.isAutoPosition = wx.CheckBox(pnl, label="定時查倉", pos=(840, 425))
         self.isAutoPosition.SetValue(False)
         self.isAutoPosition.Bind(wx.EVT_CHECKBOX, self.OnAutoPositionCheck)
-        self.position_watcher = PositionWatcher(interval=1)
+        self.position_watcher = PositionWatcher(interval=3)
 
         matquery = wx.Button(pnl, wx.ID_ANY, label='查詢',
                              pos=(1130, 420), size=(70, 25))
         matquery.Bind(wx.EVT_BUTTON, self.OnMatQueryBtn)  # 手動查詢成交回報
+
+        qtyquery = wx.Button(pnl, wx.ID_ANY, label='庫存',
+                             pos=(1050, 420), size=(70, 25))
+        qtyquery.Bind(wx.EVT_BUTTON, self.OnQtyBtn)
 
         self.MatQueryRpt = wx.ListBox(pnl, pos=(680, 450), size=(
             530, 90), style=wx.LB_SINGLE | wx.LB_HSCROLL)
@@ -532,6 +536,9 @@ class AppFrame(wx.Frame):
         # 連線行情
         self.ConnectionQuote(event=None)
         ###################################################################################
+    
+    def OnQtyBtn(self, event):
+        self.qtyLabel.SetLabel("QQ")
 
     def OnRegisterBtn(self, event):
         updatemodle = self.modle.GetString(self.modle.GetSelection())
@@ -1404,8 +1411,6 @@ class YuantaOrdEvents(object):
         if frame.last_userdefine_source == "autoposition":
             if frame.qtyLabel.GetLabel() != data["TOTAL_OFF_POSITION"]:
                 frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
-                frame.isAutoPosition.SetValue(False)
-                frame.position_watcher.stop()
                 frame.Logmessage(Results)
         elif frame.last_userdefine_source == "userquery":
             if WorkID == "FA001" or WorkID == "FA002":
@@ -1603,13 +1608,12 @@ class PositionWatcher:
         """停止背景查倉執行緒"""
         if self.thread:
             self.stop_flag.set()
-            # frame.qtyLabel.SetLabel("0")   #未連
+            frame.qtyLabel.SetLabel("未連")   
             frame.Logmessage("🛑 已停止自動查倉（執行緒將自行結束）")
             wx.CallLater(500, self._check_thread_done)
 
     def _check_thread_done(self):
         if self.thread and not self.thread.is_alive():
-            # frame.qtyLabel.SetLabel("0")    #未連
             frame.Logmessage("✅ 查倉執行緒已安全結束")
             self.thread = None
         else:
