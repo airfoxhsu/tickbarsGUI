@@ -33,6 +33,8 @@ class AppFrame(wx.Frame):
         # create a panel in the frame
         pnl = wx.Panel(self)
         self.waitMinuteToSMS = True   # 等待分鐘數重置簡訊發送
+        self.last_userdefine_source = None  # 紀錄最後一次通用查詢的來源
+
         ############################################################################
         #   API連線資訊
         wx.StaticBox(pnl, label='API連線資訊', pos=(1, 1), size=(650, 70))
@@ -658,8 +660,8 @@ class AppFrame(wx.Frame):
                 user_params = f'Func={func}|bhno={bhno}|acno={ae_no}|suba=|FC=N'
             elif func == "FA003":
                 user_params = f'Func={func}|bhno={bhno}|acno={ae_no}|suba=|type=1|currency=TWD'
-
-        # print(func,bhno,ae_no)
+        
+        self.last_userdefine_source = "userquery"
         UserDefineJob(Job.USERDEFINE, user_params, func)
 
     def OnOrderBtn(self, event=None, S_Buys=None, price=None):
@@ -965,7 +967,7 @@ class YuantaQuoteEvents(object):
                 msg = "Reconnection in trade time will be wait for 1 second"
                 if frame.waitMinuteToSMS:
                     frame.waitMinuteToSMS = False
-                    bot_message = f"{datetime.datetime.now().strftime("%H:%M:%S")}  網路中斷,目前在交易時間內請檢查連線狀況"
+                    bot_message = f"{datetime.datetime.now().strftime('%H:%M:%S')}  網路中斷,目前在交易時間內請檢查連線狀況"
                     threading.Thread(target=ts.telegram_bot_sendtext, args=(
                         bot_message,), daemon=True).start()
                     threading.Timer(60, frame.reset_waitMinuteToSMS).start()
@@ -1397,18 +1399,25 @@ class YuantaOrdEvents(object):
 
     def OnUserDefinsFuncResult(self, this, RowCount, Results, WorkID):
         data = dict(p.split("=") for p in Results.split("|"))
-        # if data["RETC"] == "00000":
-        if WorkID == "FA001" or WorkID == "FA002":
+        if frame.last_userdefine_source == "autoposition":
             frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
-            if self.inventoryStr=='' != Results:
-                self.inventoryStr=Results
+            # if self.inventoryStr=='':
+            #     self.inventoryStr=data["TOTAL_OFF_POSITION"]
+            #     frame.Logmessage(Results)
+            if self.inventoryStr != data["TOTAL_OFF_POSITION"]:
+                self.inventoryStr=data["TOTAL_OFF_POSITION"]
                 frame.Logmessage(Results)
-        elif WorkID == "FA003":
-            result = f'權益數:{data["EQUITY"]}  浮動損益:{data["FLOAT_MARGIN"]}  本日損益:{data["GRANTAL"]}'
-            frame.Logmessage(result)
-        # elif WorkID == "RA003":
-        else:
-            frame.Logmessage(Results)
+        elif frame.last_userdefine_source == "userquery":
+            if WorkID == "FA001" or WorkID == "FA002":
+                frame.qtyLabel.SetLabel(data["TOTAL_OFF_POSITION"])
+                frame.Logmessage(Results)
+            elif WorkID == "FA003":
+                result = f'權益數:{data["EQUITY"]}  浮動損益:{data["FLOAT_MARGIN"]}  本日損益:{data["GRANTAL"]}'
+                frame.Logmessage(result)
+            # elif WorkID == "RA003":
+            else:
+                frame.Logmessage(Results)
+        frame.last_userdefine_source = None    
 
     # 自動委託回報 Event
     def OnOrdRptF(self, this, Omkt, Mktt, Cmbf, Statusc, Ts_Code, Ts_Msg, Bhno, AcNo,
@@ -1417,7 +1426,7 @@ class YuantaOrdEvents(object):
                   O_Src, O_Lin, A_Prc, Oseq_No, Err_Code,
                   Err_Msg, R_Time, D_Flag):        
         # 檢查庫存
-        frame.OnUserDefineBtn(event=None, method="庫存")   
+        # frame.OnUserDefineBtn(event=None, method="庫存")   
         # 檢查庫存  手動呼叫事件函式
         # frame.isAutoPosition.SetValue(True)
         # frame.OnAutoPositionCheck(None)
@@ -1571,7 +1580,8 @@ class PositionWatcher:
     def __init__(self, interval=30):
         self.interval = interval
         self.stop_flag = threading.Event()
-        self.thread = None
+        self.thread = None       
+        self.user_params = None
 
     def start(self):
         """啟動背景查倉執行緒"""
@@ -1581,6 +1591,11 @@ class PositionWatcher:
         self.stop_flag.clear()
         self.thread = threading.Thread(target=self._loop, daemon=True)
         self.thread.start()
+        vars = frame.acclist_combo.GetString(
+            frame.acclist_combo.GetSelection()).split('-')
+        bhno = vars[1]
+        ae_no = vars[2]
+        self.user_params = f'Func=FA001|bhno={bhno}|acno={ae_no}|suba=|kind=A|FC=N'
         frame.Logmessage("✅ 已啟動自動查倉")
 
     def stop(self):
@@ -1600,8 +1615,10 @@ class PositionWatcher:
 
     def _loop(self):
         """執行緒主迴圈"""
-        while not self.stop_flag.is_set() and frame.acclist_combo.GetCount() != 0:
-            frame.OnUserDefineBtn(event=None, method="庫存")
+        while not self.stop_flag.is_set() and frame.acclist_combo.GetCount() != 0 and not frame.last_userdefine_source:
+            frame.last_userdefine_source = "autoposition"
+            # frame.OnUserDefineBtn(event=None, method="庫存")
+            UserDefineJob(Job.USERDEFINE, self.user_params, "FA001")
             time.sleep(self.interval)
 
 
