@@ -13,9 +13,11 @@ import queue as queue
 import json
 import datetime
 import dateutil.relativedelta
-import trading_strategy_calc
+# import trading_strategy_calc
+import trading_strategy_calc_refactored_2
 from colorama import Fore, Back, Style, init
 from functools import partial
+
 
 user32 = windll.user32
 atl = windll.atl
@@ -28,6 +30,10 @@ class AppFrame(wx.Frame):
     """
 
     def __init__(self, *args, **kw):
+        # Integrated TradingStrategy initialization
+        self.TELEGRAM_TOKEN = "8341950229:AAHw3h_p0Bnf_KcS5Mr4x3cOpIKHeFACiBs"
+        self.TELEGRAM_CHAT_ID = "8485648973"
+
         # ensure the parent's __init__ is called
         super(AppFrame, self).__init__(*args, **kw)
         # create a panel in the frame
@@ -1639,7 +1645,7 @@ class PositionWatcher:
             UserDefineJob(Job.USERDEFINE, self.user_params, "FA001")
             time.sleep(self.interval)
         frame.Logmessage("查倉執行緒結束 (正常退出或條件不符)")
-        self.thread = None
+        # self.thread = None
         
 
 
@@ -1711,7 +1717,7 @@ if __name__ == "__main__":
     frame.SetPosition((10, 10))
     frame.Show(True)
     Bot = StockBot(frame.Handle)
-    ts = trading_strategy_calc.TradingStrategy(frame)
+    ts = trading_strategy_calc_refactored_2.TradingStrategy(frame)
     app.MainLoop(run_job)
 
 """
