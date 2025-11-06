@@ -1633,11 +1633,14 @@ class PositionWatcher:
 
     def _loop(self):
         """執行緒主迴圈"""
-        while not self.stop_flag.is_set() and frame.acclist_combo.GetCount() != 0 and not frame.last_userdefine_source:
+        while not self.stop_flag.is_set() and frame.acclist_combo.GetCount() != 0: # and not frame.last_userdefine_source:
             frame.last_userdefine_source = "autoposition"
             # frame.OnUserDefineBtn(event=None, method="庫存")
             UserDefineJob(Job.USERDEFINE, self.user_params, "FA001")
             time.sleep(self.interval)
+        frame.Logmessage("查倉執行緒結束 (正常退出或條件不符)")
+        self.thread = None
+        
 
 
 def DoJob(Bot, x):    # x表示各類Job

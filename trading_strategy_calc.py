@@ -52,7 +52,9 @@ class TradingStrategy:
         self.trending_up = False
         self.pre_ATR = 0
         self.entry_signal = False
-        self.entry_price = 0
+        self.entry_price_buy = 0     # 多單進場價
+        self.entry_price_sell = 0    # 空單進場價
+        # self.entry_price = 0
         self.temp_entry_price = 0
         self.temp_total_spread = 0
         self.warning_signal = False
@@ -202,50 +204,6 @@ class TradingStrategy:
             self.temp_TXF_MXF_TR = 0
             self.temp_tickbars_avg_price = 0
 
-        # if self.trading_sell == True and self.stopLoss_sell <= self.new_price:
-        #     # self.trading_buy = False
-        #     self.trading_sell = False
-
-        #     self.fibonacci_chkSell_str = "0"
-        #     new_choices = ["0"]  # 或給預設選單
-        #     self.frame.price_combo.SetItems(new_choices)
-        #     self.frame.price_combo.SetSelection(0)
-
-        #     self.frame.signalGrid.SetCellValue(0, 0, "放空止損")
-        #     self.frame.signalGrid.SetCellValue(0, 1, "       ")
-        #     self.frame.signalGrid.SetCellValue(0, 2, "猶豫不決")
-        #     self.frame.signalGrid.SetCellValue(0, 3, "老而無成")
-        #     self.frame.signalGrid.SetCellValue(0, 4, "平倉不悔")
-
-        #     bot_message = f"{MatchTime}  放空止損: {int(self.new_price)}  平倉不悔"
-        #     print(
-        #         f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}  放空止損: {int(self.new_price)}  平倉不悔{Style.RESET_ALL}")
-        #     if self.frame.isSMS.GetValue() == True:
-        #         threading.Thread(target=self.telegram_bot_sendtext, args=(
-        #             bot_message,), daemon=True).start()
-
-        # if self.trading_buy == True and self.stopLoss_buy >= self.new_price:            
-        #     self.trading_buy = False
-        #     # self.trading_sell = False
-
-        #     self.fibonacci_chkBuy_str = "0"
-        #     new_choices = ["0"]  # 或給預設選單
-        #     self.frame.price_combo.SetItems(new_choices)
-        #     self.frame.price_combo.SetSelection(0)
-
-        #     self.frame.signalGrid.SetCellValue(1, 0, "作多止損")
-        #     self.frame.signalGrid.SetCellValue(1, 1, "       ")
-        #     self.frame.signalGrid.SetCellValue(1, 2, "猶豫不決")
-        #     self.frame.signalGrid.SetCellValue(1, 3, "老而無成")
-        #     self.frame.signalGrid.SetCellValue(1, 4, "平倉不悔")
-
-        #     bot_message = f"{MatchTime}  作多止損: {int(self.new_price)}  平倉不悔"
-        #     print(
-        #         f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}  作多止損: {int(self.new_price)}  平倉不悔{Style.RESET_ALL}")
-        #     if self.frame.isSMS.GetValue() == True:
-        #         threading.Thread(target=self.telegram_bot_sendtext, args=(
-        #             bot_message,), daemon=True).start()
-
         up_down_str = ""
         # if self.price_compare_database and self.TXF_database:
         if self.TXF_database and self.MXF_database:
@@ -316,9 +274,53 @@ class TradingStrategy:
             1, 4, str(int(self.temp_tickbars_avg_price)))
 
         value = int(self.frame.compareInfoGrid.GetCellValue(0, 6))
-        # if self.group_size >= 10:
+
         if self.group_size >= value:
             self.show_tickbars(MatchTime, tol_time, tol_time_str)
+
+                # === [新增] 即時停利判斷 ===
+        def _parse_profit_triplet(s):
+            try:
+                parts = [int(x.strip()) for x in s.split(":") if x.strip().isdigit()]
+                if len(parts) >= 3:
+                    return parts[0], parts[1], parts[2]
+            except Exception:
+                pass
+            return None, None, None
+
+        # 空單移動停利邏輯
+        if self.trading_sell:
+            p1, p2, p3 = _parse_profit_triplet(self.profit_sell_str)
+            if p1 and p2 and p3 and self.entry_price_sell:
+                if self.new_price <= p1 and self.stopLoss_sell > self.entry_price_sell:
+                    self.stopLoss_sell = self.entry_price_sell
+                    print(Fore.CYAN + f"🟢 空單觸及 profit_1 → 停損改至進場價 {self.stopLoss_sell}" + Style.RESET_ALL)
+                elif self.new_price <= p2 and self.stopLoss_sell > p1:
+                    self.stopLoss_sell = p1
+                    print(Fore.CYAN + f"🟢 空單觸及 profit_2 → 停損改至 {self.stopLoss_sell}" + Style.RESET_ALL)
+                elif self.new_price <= p3:
+                    print(Fore.MAGENTA + f"🏁 空單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
+                    self.frame.OnOrderBtn(event=None, S_Buys="B", price=self.new_price)
+                    self.trading_sell = False
+                    self.sell_signal = False
+
+        # 多單移動停利邏輯
+        elif self.trading_buy:
+            p1, p2, p3 = _parse_profit_triplet(self.profit_buy_str)
+            if p1 and p2 and p3 and self.entry_price_buy:
+                if self.new_price >= p1 and self.stopLoss_buy < self.entry_price_buy:
+                    self.stopLoss_buy = self.entry_price_buy
+                    print(Fore.CYAN + f"🟢 多單觸及 profit_1 → 停損改至進場價 {self.stopLoss_buy}" + Style.RESET_ALL)
+                elif self.new_price >= p2 and self.stopLoss_buy < p1:
+                    self.stopLoss_buy = p1
+                    print(Fore.CYAN + f"🟢 多單觸及 profit_2 → 停損改至 {self.stopLoss_buy}" + Style.RESET_ALL)
+                elif self.new_price >= p3:
+                    print(Fore.MAGENTA + f"🏁 多單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
+                    self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price)
+                    self.trading_buy = False
+                    self.buy_signal = False
+
+
 
     def show_tickbars(self, MatchTime, tol_time, tol_time_str):
         temp = ""
@@ -481,6 +483,7 @@ class TradingStrategy:
                 self.frame.price_combo.SetSelection(4)
 
             temp = "進場空"
+            self.entry_price_sell = int(self.list_close_price[-1])  # 記錄空單進場價
             self.suspected_sell = False
             self.sell_signal=True
             if self.frame.chkSell.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
@@ -533,6 +536,7 @@ class TradingStrategy:
                 self.frame.price_combo.SetSelection(4)
 
             temp = "進場多"
+            self.entry_price_buy = int(self.list_close_price[-1])   # 記錄多單進場價
             self.suspected_buy = False
             self.buy_signal=True
             if self.frame.chkBuy.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
@@ -628,6 +632,11 @@ class TradingStrategy:
             if self.highest_price == 0 or self.lowest_price == 0:
                 self.highest_price = int(HighPri)
                 self.lowest_price = int(LowPri)
+            else:
+                if int(HighPri) > self.highest_price:
+                    self.highest_price = int(HighPri)
+                if int(LowPri) < self.lowest_price:
+                    self.lowest_price = int(LowPri)
 
              # 計算交易時段總均價
             self.calc_avg_price()
@@ -885,7 +894,7 @@ class RedirectText:
         for seg in segments:
             # 檢查 colorama 控制碼
             if any(code in seg for code in [
-                Fore.RED, Fore.GREEN, Fore.YELLOW, Fore.CYAN, Fore.BLACK, Fore.WHITE,
+                Fore.RED, Fore.GREEN, Fore.YELLOW, Fore.CYAN, Fore.BLACK, Fore.MAGENTA, Fore.WHITE,
                 Back.WHITE, Back.RED, Back.BLUE, Back.GREEN,
                 Style.BRIGHT, Style.RESET_ALL
             ]):
@@ -901,6 +910,8 @@ class RedirectText:
                     fg = wx.Colour(0, 0, 0)
                 elif Fore.WHITE in seg:
                     fg = wx.Colour(255, 255, 255)
+                elif Fore.MAGENTA in seg:
+                    fg = wx.Colour(255, 0, 255)
 
                 if Back.WHITE in seg:
                     bg = wx.Colour(255, 255, 255)
