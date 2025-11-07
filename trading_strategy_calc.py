@@ -275,6 +275,7 @@ class TradingStrategy:
         self.temp_TXF_MXF_TR += (self.new_price * self.tmp_qty)
         self.temp_tickbars_avg_price = self.temp_TXF_MXF_TR / \
             (self.temp_tickbars_total_volume)
+        
         self.frame.compareInfoGrid.SetCellValue(
             1, 3, str(int(self.temp_tickbars_total_volume)))
         self.frame.compareInfoGrid.SetCellValue(
@@ -285,7 +286,7 @@ class TradingStrategy:
         if self.group_size >= value:
             self.show_tickbars(MatchTime, tol_time, tol_time_str)
 
-        #         # === [新增] 即時停利判斷 ===
+                # === [新增] 即時停利判斷 ===
         # def _parse_profit_triplet(s):
         #     try:
         #         parts = [int(x.strip()) for x in s.split(":") if x.strip().isdigit()]
@@ -405,11 +406,11 @@ class TradingStrategy:
             self.is_daylow = True
 
          # 1代表空 2代表多
-         # 判斷收盤價的漲跌
-        if self.list_close_price[-1] < self.list_temp_tickbars_avg_price[-1]:
-            mark_temp_close_avg_price_num = 1
-        elif self.list_close_price[-1] > self.list_temp_tickbars_avg_price[-1]:
-            mark_temp_close_avg_price_num = 2
+        #  # 判斷收盤價的漲跌
+        # if self.list_close_price[-1] < self.list_temp_tickbars_avg_price[-1]:
+        #     mark_temp_close_avg_price_num = 1
+        # elif self.list_close_price[-1] > self.list_temp_tickbars_avg_price[-1]:
+        #     mark_temp_close_avg_price_num = 2
 
         # 判斷tickbars高價的漲跌
         if len(self.list_temp_tickbars_big_price) > 1 and self.list_temp_tickbars_big_price[-2] >= self.list_temp_tickbars_big_price[-1]:
@@ -423,11 +424,11 @@ class TradingStrategy:
         elif len(self.list_temp_tickbars_small_price) > 1 and self.list_temp_tickbars_small_price[-2] <= self.list_temp_tickbars_small_price[-1]:
             mark_temp_small_price_num = 2
 
-        # 判斷tickbars均價的漲跌
-        if len(self.list_temp_tickbars_avg_price) > 1 and self.list_temp_tickbars_avg_price[-2] > self.list_temp_tickbars_avg_price[-1]:
-            mark_temp_tickbars_avg_price_num = 1
-        elif len(self.list_temp_tickbars_avg_price) > 1 and self.list_temp_tickbars_avg_price[-2] < self.list_temp_tickbars_avg_price[-1]:
-            mark_temp_tickbars_avg_price_num = 2
+        # # 判斷tickbars均價的漲跌
+        # if len(self.list_temp_tickbars_avg_price) > 1 and self.list_temp_tickbars_avg_price[-2] > self.list_temp_tickbars_avg_price[-1]:
+        #     mark_temp_tickbars_avg_price_num = 1
+        # elif len(self.list_temp_tickbars_avg_price) > 1 and self.list_temp_tickbars_avg_price[-2] < self.list_temp_tickbars_avg_price[-1]:
+        #     mark_temp_tickbars_avg_price_num = 2
 
         # 判斷tickbars總成交量的量增減
         if len(self.list_temp_tickbars_total_volume) > 1 and self.list_temp_tickbars_total_volume[-2] < self.list_temp_tickbars_total_volume[-1]:
