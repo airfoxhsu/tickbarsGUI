@@ -148,8 +148,10 @@ class AppFrame(wx.Frame):
         price = int(val) if val.isdigit() else 0
         S_Buys = self.bscode1_combo.GetString(
             self.bscode1_combo.GetSelection())[0:1]
+        offset = self.offset_combo.GetString(
+                self.offset_combo.GetSelection())[0:1],
         order.Bind(wx.EVT_BUTTON, partial(
-            self.OnOrderBtn, S_Buys=S_Buys, price=price))
+            self.OnOrderBtn, S_Buys=S_Buys, price=price, offset=offset))
 
         logon = wx.Button(pnl, wx.ID_ANY, label='登入',
                           pos=(518, 156), size=(50, 25))
@@ -456,8 +458,8 @@ class AppFrame(wx.Frame):
         self.compareInfoGrid.SetColLabelValue(1, "比較低")
         self.compareInfoGrid.SetColLabelValue(2, "比較時間")
         self.compareInfoGrid.SetColLabelValue(3, "比較量")
-        self.compareInfoGrid.SetColLabelValue(4, "當時均價")
-        self.compareInfoGrid.SetColLabelValue(5, "比較均價")
+        self.compareInfoGrid.SetColLabelValue(4, "比較均價")
+        self.compareInfoGrid.SetColLabelValue(5, "總平均價")
         self.compareInfoGrid.SetColLabelValue(6, "筆數")
 
         self.compareInfoGrid.SetCellValue(0, 0, "空倉不急")
@@ -677,7 +679,7 @@ class AppFrame(wx.Frame):
         self.last_userdefine_source = "userquery"
         UserDefineJob(Job.USERDEFINE, user_params, func)
 
-    def OnOrderBtn(self, event=None, S_Buys=None, price=None):
+    def OnOrderBtn(self, event=None, S_Buys=None, price=None, offset=None):
         if self.acclist_combo.GetCount() == 0:
             # wx.MessageBox('請先登入並選擇期貨帳號','錯誤',wx.OK | wx.ICON_ERROR)
             self.Logmessage('請先登入並選擇期貨帳號')
@@ -1123,13 +1125,14 @@ class UserDefineJob(Job):
 
 
 class OrderJob(Job):
-    def __init__(self, job_type, bhno, account, ae_no, S_Buys, price):
+    def __init__(self, job_type, bhno, account, ae_no, S_Buys, price, offset):
         super(OrderJob, self).__init__(job_type)
         self.bhno = bhno
         self.account = account
         self.ae_no = ae_no
         self.S_Buys = S_Buys
         self.price = price
+        self.offset = offset
         q.put(self)
 
 
@@ -1209,7 +1212,7 @@ class StockBot:
         ret = self.Yuanta.YuantaOrd.UserDefinsFunc(params, workid)
         # frame.Logmessage('user define ret = {}'.format(ret))
 
-    def send_order(self, bhon, account, ae_no ,S_Buys ,price):
+    def send_order(self, bhon, account, ae_no ,S_Buys ,price ,offset):
         ## 同步、非同步##
         if frame.wait.GetValue() == True:
             self.Yuanta.YuantaOrd.SetWaitOrdResult(1)
@@ -1284,8 +1287,9 @@ class StockBot:
             price,
             frame.lots_combo.GetString(
                 frame.lots_combo.GetSelection())[0:1],
-            frame.offset_combo.GetString(
-                frame.offset_combo.GetSelection())[0:1],
+            # frame.offset_combo.GetString(
+            #     frame.offset_combo.GetSelection())[0:1],
+            offset,
             frame.pritype_combo.GetString(
                 frame.pritype_combo.GetSelection())[0:1],
             frame.pritype_cond.GetString(
@@ -1661,7 +1665,7 @@ def DoJob(Bot, x):    # x表示各類Job
             Bot.user_define(x.params, x.workid)
             break
         if case(Job.ORDER):
-            Bot.send_order(x.bhno, x.account, x.ae_no ,x.S_Buys ,x.price)
+            Bot.send_order(x.bhno, x.account, x.ae_no ,x.S_Buys ,x.price ,x.offset)
             break
         if case(Job.ORDQUERY):
             Bot.send_ordQuery(x.bhno, x.account, x.ae_no)

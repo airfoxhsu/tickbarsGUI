@@ -72,8 +72,8 @@ class TradingStrategy:
         self.list_temp_tickbars_big_price = []      # 每根tickbar的最高價
         self.list_temp_tickbars_small_price = []    # 每根tickbar的最低價
         self.list_temp_tickbars_total_volume = []   # 每根tickbar的總量
-        self.previous_big_prince = 0      # 儲存上一根最高價
-        self.previous_small_prince = 0    # 儲存上一根最低價
+        self.previous_highest_price = 0      # 儲存上一根最高價
+        self.previous_lowest_price = 0    # 儲存上一根最低價
         self.conform_total_volume = 0
         self.count = 0
         self.pre_matchtime = 0
@@ -92,21 +92,21 @@ class TradingStrategy:
         self.temp_tickbars_total_volume = 0
         self.temp_TXF_MXF_TR = 0
         self.temp_tickbars_avg_price = 0
-        self.list_temp_tickbars_avg_price = []
         self.list_speedtime_big_price = []
         self.list_speedtime_small_price = []
         self.list_temp_up_down_str = []
         self.suspected_buy = False
         self.suspected_sell = False
-        self.sell_signal= False
-        self.buy_signal= False
-        # self.temp_howeverHighest_total_volume = 0
-        # self.temp_howeverLowest_total_volume = 0
-        # self.temp_TXF_MXF_howeverHighest = 0
-        # self.temp_TXF_MXF_howeverLowest = 0
-        # self.temp_howeverHighest_avg_price = 0
-        # self.temp_howeverLowest_avg_price = 0
+        self.sell_signal = False
+        self.buy_signal = False
 
+        self.temp_howeverHighest_total_volume = 0
+        self.temp_TXF_MXF_howeverHighest = 0
+        self.temp_howeverHighest_avg_price = 0
+
+        self.temp_howeverLowest_total_volume = 0
+        self.temp_TXF_MXF_howeverLowest = 0
+        self.temp_howeverLowest_avg_price = 0
 
     def execate_TXF_MXF(self, direction, symbol, RefPri, OpenPri, HighPri, LowPri, MatchTime, MatchPri, MatchQty, TolMatchQty, Is_simulation):
         if "XF" in symbol:
@@ -121,20 +121,19 @@ class TradingStrategy:
             self.calculate_time(self.MXF_database, RefPri, HighPri, LowPri,
                                 MatchQty, TolMatchQty, MatchTime, Is_simulation)
 
-    def calculate_tickbars(self, MatchTime, Is_simulation):    
+    def calculate_tickbars(self, MatchTime, Is_simulation):
         if self.highest_price < self.new_price:
-            if self.trading_sell == True: 
+            if self.trading_sell == True:
                 if self.frame.acclist_combo.GetCount() != 0 and self.frame.chkSell.GetValue() == True:
                     val = self.frame.qtyLabel.GetLabel()
                     qty = int(val) if val.isdigit() else 0
                     if qty > 0:
-                        self.frame.OnOrderBtn(event=None, S_Buys="B", price=self.new_price)
-                        # threading.Thread(target=self.frame.OnOrderBtn, args=(
-                        #     "B", self.new_price, wx.EVT_BUTTON,), daemon=True).start()   
-                        self.frame.qtyLabel.SetLabel("未連") 
-            if self.sell_signal== True:    
+                        self.frame.OnOrderBtn(
+                            event=None, S_Buys="B", price=self.new_price, offset="1")
+                        self.frame.qtyLabel.SetLabel("未連")
+            if self.sell_signal == True:
                 self.trading_sell = False
-                self.sell_signal= False
+                self.sell_signal = False
                 self.fibonacci_chkSell_str = "0"
                 new_choices = ["0"]  # 或給預設選單
                 self.frame.price_combo.SetItems(new_choices)
@@ -166,19 +165,23 @@ class TradingStrategy:
             self.temp_tickbars_total_volume = 0
             self.temp_TXF_MXF_TR = 0
             self.temp_tickbars_avg_price = 0
+
+            self.temp_howeverHighest_total_volume = 0
+            self.temp_TXF_MXF_howeverHighest = 0
+            self.temp_howeverHighest_avg_price = 0
+
         elif self.lowest_price > self.new_price:
             if self.trading_buy == True:
                 if self.frame.acclist_combo.GetCount() != 0 and self.frame.chkBuy.GetValue() == True:
                     val = self.frame.qtyLabel.GetLabel()
                     qty = int(val) if val.isdigit() else 0
                     if qty > 0:
-                        self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price)
-                        # threading.Thread(target=self.frame.OnOrderBtn, args=(
-                        #     "S", self.new_price, wx.EVT_BUTTON,), daemon=True).start()
+                        self.frame.OnOrderBtn(
+                            event=None, S_Buys="S", price=self.new_price, offset="1")
                         self.frame.qtyLabel.SetLabel("未連")
-            if self.buy_signal== True:
+            if self.buy_signal == True:
                 self.trading_buy = False
-                self.buy_signal= False
+                self.buy_signal = False
                 self.fibonacci_chkBuy_str = "0"
                 new_choices = ["0"]  # 或給預設選單
                 self.frame.price_combo.SetItems(new_choices)
@@ -210,6 +213,10 @@ class TradingStrategy:
             self.temp_tickbars_total_volume = 0
             self.temp_TXF_MXF_TR = 0
             self.temp_tickbars_avg_price = 0
+            
+            self.temp_howeverLowest_total_volume = 0
+            self.temp_TXF_MXF_howeverLowest = 0
+            self.temp_howeverLowest_avg_price = 0
 
         up_down_str = ""
         # if self.price_compare_database and self.TXF_database:
@@ -233,7 +240,7 @@ class TradingStrategy:
         if (self.trending_up and self.pre_ATR > self.TXF_MXF_avg_price) or (self.trending_down and self.pre_ATR < self.TXF_MXF_avg_price) and self.temp_price_compare_database:
             self.trending_up = False
             self.trending_down = False
-            
+
         self.pre_ATR = self.TXF_MXF_avg_price
         if self.matchtime != 0:
             # 計算時間差
@@ -275,7 +282,19 @@ class TradingStrategy:
         self.temp_TXF_MXF_TR += (self.new_price * self.tmp_qty)
         self.temp_tickbars_avg_price = self.temp_TXF_MXF_TR / \
             (self.temp_tickbars_total_volume)
-        
+       
+        if self.sell_signal == False:
+            self.temp_howeverHighest_total_volume += self.tmp_qty
+            self.temp_TXF_MXF_howeverHighest += (self.new_price * self.tmp_qty)
+            self.temp_howeverHighest_avg_price = self.temp_TXF_MXF_howeverHighest / \
+                (self.temp_howeverHighest_total_volume)
+
+        if self.buy_signal == False:
+            self.temp_howeverLowest_total_volume += self.tmp_qty
+            self.temp_TXF_MXF_howeverLowest += (self.new_price * self.tmp_qty)
+            self.temp_howeverLowest_avg_price = self.temp_TXF_MXF_howeverLowest / \
+                (self.temp_howeverLowest_total_volume)
+
         self.frame.compareInfoGrid.SetCellValue(
             1, 3, str(int(self.temp_tickbars_total_volume)))
         self.frame.compareInfoGrid.SetCellValue(
@@ -286,7 +305,7 @@ class TradingStrategy:
         if self.group_size >= value:
             self.show_tickbars(MatchTime, tol_time, tol_time_str)
 
-                # === [新增] 即時停利判斷 ===
+            # === [新增] 即時停利判斷 ===
         # def _parse_profit_triplet(s):
         #     try:
         #         parts = [int(x.strip()) for x in s.split(":") if x.strip().isdigit()]
@@ -308,7 +327,7 @@ class TradingStrategy:
         #             print(Fore.CYAN + f"🟢 空單觸及 profit_2 → 停損改至 {self.stopLoss_sell}" + Style.RESET_ALL)
         #         elif self.new_price <= p3:
         #             print(Fore.MAGENTA + f"🏁 空單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
-        #             self.frame.OnOrderBtn(event=None, S_Buys="B", price=self.new_price)
+        #             self.frame.OnOrderBtn(event=None, S_Buys="B", price=self.new_price, offset="1")
         #             self.trading_sell = False
         #             self.sell_signal = False
 
@@ -324,11 +343,9 @@ class TradingStrategy:
         #             print(Fore.CYAN + f"🟢 多單觸及 profit_2 → 停損改至 {self.stopLoss_buy}" + Style.RESET_ALL)
         #         elif self.new_price >= p3:
         #             print(Fore.MAGENTA + f"🏁 多單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
-        #             self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price)
+        #             self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price, offset="1")
         #             self.trading_buy = False
         #             self.buy_signal = False
-
-
 
     def show_tickbars(self, MatchTime, tol_time, tol_time_str):
         temp = ""
@@ -343,7 +360,9 @@ class TradingStrategy:
         temp_avg_price = 0
 
         mark_tol_time_color = "Style.RESET_ALL"
-        mark_temp_up_down_str_color = "Style.RESET_ALL"
+        # mark_temp_up_down_str_color = "Style.RESET_ALL"
+        mark_temp_highest_arrow_color = "Style.RESET_ALL"
+        mark_temp_lowest_arrow_color = "Style.RESET_ALL"
         mark_temp_big_price_color = "Fore.YELLOW + Style.BRIGHT"
         mark_temp_small_price_color = "Fore.YELLOW + Style.BRIGHT"
         mark_temp_close_price_color = "Fore.YELLOW + Style.BRIGHT"
@@ -378,27 +397,36 @@ class TradingStrategy:
         # self.group_size_var.set(str(float(round(self.TXF_MXF_avg_price, 4))))
         self.frame.compareInfoGrid.SetCellValue(0, 2, tol_time_str)
 
-        temp_up_down_str = "．"
-        if self.previous_big_prince == self.highest_price and self.previous_small_prince == self.lowest_price:
-            if self.temp_price_compare_database['up']:
-                temp_up_down_str = "↑"
-            elif self.temp_price_compare_database['down']:
-                temp_up_down_str = "↓"
-        # elif len(self.list_temp_tickbars_big_price) > 1 and len(self.list_temp_tickbars_small_price) > 1 and (self.list_temp_tickbars_big_price[-1] == self.list_temp_tickbars_big_price[-2] or self.list_temp_tickbars_small_price[-1] == self.list_temp_tickbars_small_price[-2]):
+        # temp_up_down_str = "．"
+        temp_highest_arrow = "．"
+        temp_lowest_arrow = "．"
+        # if self.previous_highest_price == self.highest_price and self.previous_lowest_price == self.lowest_price:
         #     if self.temp_price_compare_database['up']:
         #         temp_up_down_str = "↑"
         #     elif self.temp_price_compare_database['down']:
         #         temp_up_down_str = "↓"
 
-        self.previous_big_prince = self.highest_price
-        self.previous_small_prince = self.lowest_price
+        if self.previous_highest_price == self.highest_price:
+            if self.temp_price_compare_database['up']:
+                temp_highest_arrow = "↑"
+            elif self.temp_price_compare_database['down']:
+                temp_highest_arrow = "↓"
+
+        if self.previous_lowest_price == self.lowest_price:
+            if self.temp_price_compare_database['up']:
+                temp_lowest_arrow = "↑"
+            elif self.temp_price_compare_database['down']:
+                temp_lowest_arrow = "↓"
+
+        self.previous_highest_price = self.highest_price
+        self.previous_lowest_price = self.lowest_price
 
         self.frame.compareInfoGrid.SetCellTextColour(0, 0, wx.RED)
         self.frame.compareInfoGrid.SetCellTextColour(0, 1, wx.GREEN)
         self.frame.compareInfoGrid.SetCellValue(
-            0, 0, str(int(self.list_temp_tickbars_big_price[-1])))
+            0, 0, str(int(self.list_temp_tickbars_big_price[-1]))+"  "+temp_highest_arrow)
         self.frame.compareInfoGrid.SetCellValue(
-            0, 1, str(int(self.list_temp_tickbars_small_price[-1]))+"  "+temp_up_down_str)
+            0, 1, str(int(self.list_temp_tickbars_small_price[-1]))+"  "+temp_lowest_arrow)
 
         if len(self.list_temp_tickbars_big_price) > 1 and self.list_temp_tickbars_big_price[-1] == self.highest_price:
             self.is_dayhigh = True
@@ -436,20 +464,28 @@ class TradingStrategy:
 
         # 判斷tickbars時間的快慢
 
-        if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and (temp_up_down_str == "↑" or temp_up_down_str == "↓"):
-            mark_temp_up_down_str_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
+        # if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and (temp_up_down_str == "↑" or temp_up_down_str == "↓"):
+        #     mark_temp_up_down_str_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
+        #     mark_speedtime_num = 1
+
+        if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_highest_arrow == "↓":
+            mark_temp_highest_arrow_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
+            mark_speedtime_num = 1
+
+        if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_lowest_arrow == "↑":
+            mark_temp_lowest_arrow_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
             mark_speedtime_num = 1
 
         if mark_speedtime_num == 1:
             # if self.is_dayhigh and mark_temp_big_price_num == 1 and mark_temp_small_price_num == 1 and temp_up_down_str == "↓" and mark_temp_close_avg_price_num == 1:
-            if self.is_dayhigh and temp_up_down_str == "↓":
+            if self.is_dayhigh and temp_highest_arrow == "↓":
                 self.is_dayhigh = False
                 # self.conform_total_volume = self.list_temp_tickbars_total_volume[-1]
                 # mark_temp_big_price_color = "Fore.WHITE + Style.BRIGHT + Back.GREEN"
                 # temp = "疑作頭"
                 self.suspected_sell = True
             # elif self.is_daylow and mark_temp_big_price_num == 2 and mark_temp_small_price_num == 2 and temp_up_down_str == "↑" and mark_temp_close_avg_price_num == 2:
-            elif self.is_daylow and temp_up_down_str == "↑":
+            elif self.is_daylow and temp_lowest_arrow == "↑":
                 self.is_daylow = False
                 # self.conform_total_volume = self.list_temp_tickbars_total_volume[-1]
                 # mark_temp_small_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
@@ -458,7 +494,8 @@ class TradingStrategy:
 
         if len(self.list_tickbars_tol_time) > 1 and (self.list_tickbars_tol_time[-2]/2) > self.list_tickbars_tol_time[-1]:
             mark_tol_time_color = "Fore.BLACK + Back.WHITE"
-        if self.suspected_sell == True and temp_up_down_str == "↓":
+
+        if self.suspected_sell == True and temp_highest_arrow == "↓":
             self.trading_sell = True
             # self.trading_buy = False
             mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.GREEN"
@@ -481,38 +518,36 @@ class TradingStrategy:
             self.frame.signalGrid.SetCellValue(0, 3, str(int(profit_2)))
             self.frame.signalGrid.SetCellValue(0, 4, str(int(profit_3)))
 
-            self.fibonacci_chkSell_str =self.fibonacci_sell_str
+            self.fibonacci_chkSell_str = self.fibonacci_sell_str
             self.profit_sell_str = f"{int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
 
-            
             if self.frame.chkSell.IsChecked():
-                new_choices = [s.strip() for s in self.fibonacci_chkSell_str.split(":")]
+                new_choices = [s.strip()
+                               for s in self.fibonacci_chkSell_str.split(":")]
                 self.frame.price_combo.SetItems(new_choices)
                 self.frame.price_combo.SetSelection(4)
 
             temp = "進場空"
             self.entry_price_sell = int(self.list_close_price[-1])  # 記錄空單進場價
             self.suspected_sell = False
-            self.sell_signal=True
+            self.sell_signal = True
             if self.frame.chkSell.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
-                val = self.frame.price_combo.GetString(self.frame.price_combo.GetSelection())
+                val = self.frame.price_combo.GetString(
+                    self.frame.price_combo.GetSelection())
                 price = int(val) if val.isdigit() else 0
-                # S_Buys = self.frame.bscode1_combo.GetString(
-                #     self.frame.bscode1_combo.GetSelection())[0:1]
-                self.frame.OnOrderBtn(event=None, S_Buys="S", price=price)
-                # threading.Thread(target=self.frame.OnOrderBtn, args=(
-                #         S_Buys, price, wx.EVT_BUTTON,), daemon=True).start()
-                
+                self.frame.OnOrderBtn(
+                    event=None, S_Buys="S", price=price, offset="0")
+
             if self.frame.isPlaySound.GetValue() == True:
                 threading.Thread(target=winsound.PlaySound, args=(
                     "woo.wav", winsound.SND_FILENAME), daemon=True).start()
-                
+
             if self.frame.isSMS.GetValue() == True:
                 bot_message = f"{MatchTime}  放空進場: {int(self.list_close_price[-1])}  止損: {int(self.stopLoss_sell)}  停利: {int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
                 threading.Thread(target=self.telegram_bot_sendtext, args=(
                     bot_message,), daemon=True).start()
 
-        if self.suspected_buy == True and temp_up_down_str == "↑":
+        if self.suspected_buy == True and temp_lowest_arrow == "↑":
             self.trading_buy = True
             # self.trading_sell = False
             mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
@@ -535,31 +570,32 @@ class TradingStrategy:
             self.frame.signalGrid.SetCellValue(1, 3, str(int(profit_2)))
             self.frame.signalGrid.SetCellValue(1, 4, str(int(profit_3)))
 
-            self.fibonacci_chkBuy_str =self.fibonacci_buy_str
+            self.fibonacci_chkBuy_str = self.fibonacci_buy_str
             self.profit_buy_str = f"{int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
 
             if self.frame.chkBuy.IsChecked():
-                new_choices = [s.strip() for s in self.fibonacci_chkBuy_str.split(":")]
+                new_choices = [s.strip()
+                               for s in self.fibonacci_chkBuy_str.split(":")]
                 self.frame.price_combo.SetItems(new_choices)
                 self.frame.price_combo.SetSelection(4)
 
             temp = "進場多"
             self.entry_price_buy = int(self.list_close_price[-1])   # 記錄多單進場價
             self.suspected_buy = False
-            self.buy_signal=True
+            self.buy_signal = True
             if self.frame.chkBuy.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
-                val = self.frame.price_combo.GetString(self.frame.price_combo.GetSelection())
+                val = self.frame.price_combo.GetString(
+                    self.frame.price_combo.GetSelection())
                 price = int(val) if val.isdigit() else 0
                 # S_Buys = self.frame.bscode1_combo.GetString(
                 #     self.frame.bscode1_combo.GetSelection())[0:1]
-                self.frame.OnOrderBtn(event=None, S_Buys="B", price=price)
-                # threading.Thread(target=self.frame.OnOrderBtn, args=(
-                #         S_Buys, price, wx.EVT_BUTTON,), daemon=True).start()
-                
+                self.frame.OnOrderBtn(
+                    event=None, S_Buys="B", price=price, offset="0")
+
             if self.frame.isPlaySound.GetValue() == True:
                 threading.Thread(target=winsound.PlaySound, args=(
                     "woo.wav", winsound.SND_FILENAME), daemon=True).start()
-                
+
             if self.frame.isSMS.GetValue() == True:
                 bot_message = f"{MatchTime}  作多進場: {int(self.list_close_price[-1])}  止損: {int(self.stopLoss_buy)}  停利: {int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
                 threading.Thread(target=self.telegram_bot_sendtext, args=(
@@ -571,38 +607,39 @@ class TradingStrategy:
             # print(Style.BRIGHT + Fore.GREEN + "✅ 成功訊息 (亮綠色)"
             #   + Fore.RED + Back.WHITE + "❌ 錯誤訊息 (紅字白底)"
             #   + Style.RESET_ALL)
+
             if temp == "進場空":
                 print(
-                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_up_down_str_color)}{temp_up_down_str}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}放空 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_sell_str}   止損: {int(self.stopLoss_sell)}   停利: {self.profit_sell_str}{Style.RESET_ALL}")
 
             elif temp == "進場多":
                 print(
-                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_up_down_str_color)}{temp_up_down_str}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}買進 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_buy_str}   止損: {int(self.stopLoss_buy)}   停利: {self.profit_buy_str}{Style.RESET_ALL}")
             else:
                 print(
-                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_up_down_str_color)}{temp_up_down_str}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
 
         elif self.pre_TXF_MXF_avg_price < self.TXF_MXF_avg_price and self.temp_price_compare_database:
             self.trending_up = True
             self.trending_down = False
             if temp == "進場多":
                 print(
-                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_up_down_str_color)}{temp_up_down_str}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}買進 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_buy_str}   止損: {int(self.stopLoss_buy)}   停利: {self.profit_buy_str}{Style.RESET_ALL}")
             elif temp == "進場空":
                 print(
-                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_up_down_str_color)}{temp_up_down_str}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}放空 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_sell_str}   止損: {int(self.stopLoss_sell)}   停利: {self.profit_sell_str}{Style.RESET_ALL}")
 
             else:
                 print(
-                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_up_down_str_color)}{temp_up_down_str}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
 
         self.temp_price_compare_database = {}
         self.temp_tickbars_total_volume = 0
@@ -784,8 +821,7 @@ class TradingStrategy:
                 # 計算反彈和回檔的0.382之差
                 self.fibonacci_sell_str = f"{pressureNum_ratio_236} : {pressureNum_ratio_382} : {pressureNum_ratio_5} : {pressureNum_ratio_618} : {pressureNum_ratio_786}"
                 self.fibonacci_buy_str = f"{supportNum_ratio_236} : {supportNum_ratio_382} : {supportNum_ratio_5} : {supportNum_ratio_618} : {supportNum_ratio_786}"
-                
-                
+
                 # 費波那契數
                 # cols = self.frame.fibonacciGrid.GetNumberCols()
                 self.frame.fibonacciGrid.SetCellValue(
