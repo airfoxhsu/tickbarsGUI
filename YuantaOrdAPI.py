@@ -13,8 +13,8 @@ import queue as queue
 import json
 import datetime
 import dateutil.relativedelta
-# import trading_strategy_calc
-import trading_strategy_calc_refactored_2
+import trading_strategy_calc
+# import trading_strategy_calc_refactored_2
 from colorama import Fore, Back, Style, init
 from functools import partial
 
@@ -1717,7 +1717,8 @@ if __name__ == "__main__":
     frame.SetPosition((10, 10))
     frame.Show(True)
     Bot = StockBot(frame.Handle)
-    ts = trading_strategy_calc_refactored_2.TradingStrategy(frame)
+    # ts = trading_strategy_calc_refactored_2.TradingStrategy(frame)
+    ts= trading_strategy_calc.TradingStrategy(frame)
     app.MainLoop(run_job)
 
 """

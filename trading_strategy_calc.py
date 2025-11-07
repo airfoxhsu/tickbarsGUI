@@ -100,6 +100,13 @@ class TradingStrategy:
         self.suspected_sell = False
         self.sell_signal= False
         self.buy_signal= False
+        # self.temp_howeverHighest_total_volume = 0
+        # self.temp_howeverLowest_total_volume = 0
+        # self.temp_TXF_MXF_howeverHighest = 0
+        # self.temp_TXF_MXF_howeverLowest = 0
+        # self.temp_howeverHighest_avg_price = 0
+        # self.temp_howeverLowest_avg_price = 0
+
 
     def execate_TXF_MXF(self, direction, symbol, RefPri, OpenPri, HighPri, LowPri, MatchTime, MatchPri, MatchQty, TolMatchQty, Is_simulation):
         if "XF" in symbol:
@@ -278,47 +285,47 @@ class TradingStrategy:
         if self.group_size >= value:
             self.show_tickbars(MatchTime, tol_time, tol_time_str)
 
-                # === [新增] 即時停利判斷 ===
-        def _parse_profit_triplet(s):
-            try:
-                parts = [int(x.strip()) for x in s.split(":") if x.strip().isdigit()]
-                if len(parts) >= 3:
-                    return parts[0], parts[1], parts[2]
-            except Exception:
-                pass
-            return None, None, None
+        #         # === [新增] 即時停利判斷 ===
+        # def _parse_profit_triplet(s):
+        #     try:
+        #         parts = [int(x.strip()) for x in s.split(":") if x.strip().isdigit()]
+        #         if len(parts) >= 3:
+        #             return parts[0], parts[1], parts[2]
+        #     except Exception:
+        #         pass
+        #     return None, None, None
 
-        # 空單移動停利邏輯
-        if self.trading_sell:
-            p1, p2, p3 = _parse_profit_triplet(self.profit_sell_str)
-            if p1 and p2 and p3 and self.entry_price_sell:
-                if self.new_price <= p1 and self.stopLoss_sell > self.entry_price_sell:
-                    self.stopLoss_sell = self.entry_price_sell
-                    print(Fore.CYAN + f"🟢 空單觸及 profit_1 → 停損改至進場價 {self.stopLoss_sell}" + Style.RESET_ALL)
-                elif self.new_price <= p2 and self.stopLoss_sell > p1:
-                    self.stopLoss_sell = p1
-                    print(Fore.CYAN + f"🟢 空單觸及 profit_2 → 停損改至 {self.stopLoss_sell}" + Style.RESET_ALL)
-                elif self.new_price <= p3:
-                    print(Fore.MAGENTA + f"🏁 空單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
-                    self.frame.OnOrderBtn(event=None, S_Buys="B", price=self.new_price)
-                    self.trading_sell = False
-                    self.sell_signal = False
+        # # 空單移動停利邏輯
+        # if self.trading_sell:
+        #     p1, p2, p3 = _parse_profit_triplet(self.profit_sell_str)
+        #     if p1 and p2 and p3 and self.entry_price_sell:
+        #         if self.new_price <= p1 and self.stopLoss_sell > self.entry_price_sell:
+        #             self.stopLoss_sell = self.entry_price_sell
+        #             print(Fore.CYAN + f"🟢 空單觸及 profit_1 → 停損改至進場價 {self.stopLoss_sell}" + Style.RESET_ALL)
+        #         elif self.new_price <= p2 and self.stopLoss_sell > p1:
+        #             self.stopLoss_sell = p1
+        #             print(Fore.CYAN + f"🟢 空單觸及 profit_2 → 停損改至 {self.stopLoss_sell}" + Style.RESET_ALL)
+        #         elif self.new_price <= p3:
+        #             print(Fore.MAGENTA + f"🏁 空單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
+        #             self.frame.OnOrderBtn(event=None, S_Buys="B", price=self.new_price)
+        #             self.trading_sell = False
+        #             self.sell_signal = False
 
-        # 多單移動停利邏輯
-        elif self.trading_buy:
-            p1, p2, p3 = _parse_profit_triplet(self.profit_buy_str)
-            if p1 and p2 and p3 and self.entry_price_buy:
-                if self.new_price >= p1 and self.stopLoss_buy < self.entry_price_buy:
-                    self.stopLoss_buy = self.entry_price_buy
-                    print(Fore.CYAN + f"🟢 多單觸及 profit_1 → 停損改至進場價 {self.stopLoss_buy}" + Style.RESET_ALL)
-                elif self.new_price >= p2 and self.stopLoss_buy < p1:
-                    self.stopLoss_buy = p1
-                    print(Fore.CYAN + f"🟢 多單觸及 profit_2 → 停損改至 {self.stopLoss_buy}" + Style.RESET_ALL)
-                elif self.new_price >= p3:
-                    print(Fore.MAGENTA + f"🏁 多單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
-                    self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price)
-                    self.trading_buy = False
-                    self.buy_signal = False
+        # # 多單移動停利邏輯
+        # elif self.trading_buy:
+        #     p1, p2, p3 = _parse_profit_triplet(self.profit_buy_str)
+        #     if p1 and p2 and p3 and self.entry_price_buy:
+        #         if self.new_price >= p1 and self.stopLoss_buy < self.entry_price_buy:
+        #             self.stopLoss_buy = self.entry_price_buy
+        #             print(Fore.CYAN + f"🟢 多單觸及 profit_1 → 停損改至進場價 {self.stopLoss_buy}" + Style.RESET_ALL)
+        #         elif self.new_price >= p2 and self.stopLoss_buy < p1:
+        #             self.stopLoss_buy = p1
+        #             print(Fore.CYAN + f"🟢 多單觸及 profit_2 → 停損改至 {self.stopLoss_buy}" + Style.RESET_ALL)
+        #         elif self.new_price >= p3:
+        #             print(Fore.MAGENTA + f"🏁 多單觸及 profit_3 → 平倉 {self.new_price}" + Style.RESET_ALL)
+        #             self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price)
+        #             self.trading_buy = False
+        #             self.buy_signal = False
 
 
 
