@@ -346,7 +346,8 @@ class TradingStrategy:
         #             self.frame.OnOrderBtn(event=None, S_Buys="S", price=self.new_price, offset="1")
         #             self.trading_buy = False
         #             self.buy_signal = False
-
+        # 更新費波那契數
+        self.calculate_and_update()
     def show_tickbars(self, MatchTime, tol_time, tol_time_str):
         temp = ""
         mark_timediff_num = 0
@@ -468,13 +469,19 @@ class TradingStrategy:
         #     mark_temp_up_down_str_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
         #     mark_speedtime_num = 1
 
+        if len(self.list_tickbars_tol_time) > 1 and (self.list_tickbars_tol_time[-2]/2) > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_highest_arrow == "↓":
+            mark_tol_time_color = "Fore.BLACK + Back.WHITE"
+            mark_speedtime_num = 1
+
+        if len(self.list_tickbars_tol_time) > 1 and (self.list_tickbars_tol_time[-2]/2) > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_lowest_arrow == "↑":
+            mark_tol_time_color = "Fore.BLACK + Back.WHITE"
+            mark_speedtime_num = 1
+
         if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_highest_arrow == "↓":
             mark_temp_highest_arrow_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
-            mark_speedtime_num = 1
 
         if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_lowest_arrow == "↑":
             mark_temp_lowest_arrow_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
-            mark_speedtime_num = 1
 
         if mark_speedtime_num == 1:
             # if self.is_dayhigh and mark_temp_big_price_num == 1 and mark_temp_small_price_num == 1 and temp_up_down_str == "↓" and mark_temp_close_avg_price_num == 1:
@@ -491,9 +498,6 @@ class TradingStrategy:
                 # mark_temp_small_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
                 # temp = "疑打底"
                 self.suspected_buy = True
-
-        if len(self.list_tickbars_tol_time) > 1 and (self.list_tickbars_tol_time[-2]/2) > self.list_tickbars_tol_time[-1]:
-            mark_tol_time_color = "Fore.BLACK + Back.WHITE"
 
         if self.suspected_sell == True and temp_highest_arrow == "↓":
             self.trading_sell = True
@@ -525,7 +529,7 @@ class TradingStrategy:
                 new_choices = [s.strip()
                                for s in self.fibonacci_chkSell_str.split(":")]
                 self.frame.price_combo.SetItems(new_choices)
-                self.frame.price_combo.SetSelection(4)
+                self.frame.price_combo.SetSelection(3)
 
             temp = "進場空"
             self.entry_price_sell = int(self.list_close_price[-1])  # 記錄空單進場價
@@ -577,7 +581,7 @@ class TradingStrategy:
                 new_choices = [s.strip()
                                for s in self.fibonacci_chkBuy_str.split(":")]
                 self.frame.price_combo.SetItems(new_choices)
-                self.frame.price_combo.SetSelection(4)
+                self.frame.price_combo.SetSelection(3)
 
             temp = "進場多"
             self.entry_price_buy = int(self.list_close_price[-1])   # 記錄多單進場價

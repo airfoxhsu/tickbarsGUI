@@ -1,7 +1,7 @@
 from re import M
 import winsound
-import matplotlib.pyplot as plt
-import pandas as pd
+# import matplotlib.pyplot as plt
+# import pandas as pd
 from colorama import Fore, Style, init, Back
 import tkinter as tk
 from tkinter import messagebox

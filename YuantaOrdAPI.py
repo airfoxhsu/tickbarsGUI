@@ -206,13 +206,17 @@ class AppFrame(wx.Frame):
         self.isAutoPosition.Bind(wx.EVT_CHECKBOX, self.OnAutoPositionCheck)
         self.position_watcher = PositionWatcher(interval=1)
 
-        matquery = wx.Button(pnl, wx.ID_ANY, label='查詢',
-                             pos=(1130, 420), size=(70, 25))
-        matquery.Bind(wx.EVT_BUTTON, self.OnMatQueryBtn)  # 手動查詢成交回報
-
         qtyquery = wx.Button(pnl, wx.ID_ANY, label='庫存',
-                             pos=(1050, 420), size=(70, 25))
+                             pos=(910, 420), size=(70, 25))
         qtyquery.Bind(wx.EVT_BUTTON, self.OnQtyBtn)
+
+        qtyquery = wx.Button(pnl, wx.ID_ANY, label='回測',
+                             pos=(1060, 420), size=(70, 25))
+        qtyquery.Bind(wx.EVT_BUTTON, self.OnBacktestData)
+
+        matquery = wx.Button(pnl, wx.ID_ANY, label='查詢',
+                             pos=(1140, 420), size=(70, 25))
+        matquery.Bind(wx.EVT_BUTTON, self.OnMatQueryBtn)  # 手動查詢成交回報
 
         self.MatQueryRpt = wx.ListBox(pnl, pos=(680, 450), size=(
             530, 90), style=wx.LB_SINGLE | wx.LB_HSCROLL)
@@ -545,6 +549,35 @@ class AppFrame(wx.Frame):
         self.ConnectionQuote(event=None)
         ###################################################################################
     
+    def OnBacktestData(self, event):
+        try:
+            ts.__init__(frame)
+            with wx.FileDialog(self, "選擇檔案", wildcard="回測檔案 (event.log)|event.log",
+                            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+                    if fileDialog.ShowModal() == wx.ID_OK:
+                        filename = fileDialog.GetPath()
+                        print(f"你選擇的回測檔案是: {filename}")
+            direction = "空"  # "多" #
+            Is_simulation = 0
+            with open(filename, "r") as file:
+                tick_generator = (tick.replace("  [全] MDS=1 Symbol=", ",").replace("=", ",").strip("\n").split(
+                    ",") for tick in file if "全" in tick and "tmatqty=-1" not in tick and "open=0" not in tick)
+                for tick in tick_generator:
+                    # tick[1]：股票代號 [3]:參考價 [5]:開盤價 [7]:最高價 [9]:最低價 [15]:成交時間 [17]:成交價
+                    # tick[19]:單量 [21]:總成交量 [29]:bid [41]:askff
+                    try:
+                        if int(tick[15]) <= 134500000000 and tick[29] != "0":
+                            # 初始化大小台資料庫、計算大小台個別總量、辨別內外盤、計算每一價位的成交量及量差
+                            ts.execate_TXF_MXF(direction, tick[1], tick[3], tick[5], tick[7], tick[9], tick[15],
+                                            tick[17], tick[19], tick[21], Is_simulation)
+                        
+                    except Exception as e:
+                        print(e)
+                        # pass
+        
+        except Exception as e:
+                pass
+        
     def OnQtyBtn(self, event):
         self.qtyLabel.SetLabel("QQ")
 
@@ -619,7 +652,7 @@ class AppFrame(wx.Frame):
             if ts.fibonacci_chkSell_str and ts.fibonacci_chkSell_str.strip() != "0":
                 new_choices = [s.strip() for s in ts.fibonacci_chkSell_str.split(":")]
                 self.price_combo.SetItems(new_choices)
-                self.price_combo.SetSelection(4)
+                self.price_combo.SetSelection(3)
             else:
                 new_choices = ["0"]  # 或給預設選單
                 self.price_combo.SetItems(new_choices)
@@ -631,7 +664,7 @@ class AppFrame(wx.Frame):
             if ts.fibonacci_chkBuy_str and ts.fibonacci_chkBuy_str.strip() != "0":
                 new_choices = [s.strip() for s in ts.fibonacci_chkBuy_str.split(":")]
                 self.price_combo.SetItems(new_choices)
-                self.price_combo.SetSelection(4)
+                self.price_combo.SetSelection(3)
             else:
                 new_choices = ["0"]  # 或給預設選單
                 self.price_combo.SetItems(new_choices)
@@ -1689,7 +1722,7 @@ def DoJob(Bot, x):    # x表示各類Job
                 ts.execate_TXF_MXF(direction, x.symbol, x.RefPri, x.OpenPri, x.HighPri, x.LowPri, x.MatchTime,
                                    x.MatchPri, x.MatchQty, x.TolMatchQty, Is_simulation)
                 # 更新費波那契數
-                ts.calculate_and_update()
+                # ts.calculate_and_update()
             except Exception as e:
                 frame.Logmessage(e)
             break
