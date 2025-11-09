@@ -454,13 +454,13 @@ class TradingStrategy:
         elif len(self.list_temp_tickbars_small_price) > 1 and self.list_temp_tickbars_small_price[-2] <= self.list_temp_tickbars_small_price[-1]:
             mark_temp_small_price_num = 2
 
-        # 比較tickbars均價
-        if self.sell_signal and self.temp_tickbars_avg_price > self.temp_howeverHighest_avg_price:
-            mark_temp_compare_avg_price_color = "Fore.BLACK + Back.WHITE"
-            temp="空注意"
-        elif  self.buy_signal and self.temp_tickbars_avg_price < self.temp_howeverLowest_avg_price:
-            mark_temp_compare_avg_price_color = "Fore.BLACK + Back.WHITE"
-            temp="多注意"
+        # # 比較tickbars均價
+        # if self.sell_signal and self.temp_tickbars_avg_price > self.temp_howeverHighest_avg_price:
+        #     mark_temp_compare_avg_price_color = "Fore.BLACK + Back.WHITE"
+        #     temp="空注意"
+        # elif  self.buy_signal and self.temp_tickbars_avg_price < self.temp_howeverLowest_avg_price:
+        #     mark_temp_compare_avg_price_color = "Fore.BLACK + Back.WHITE"
+        #     temp="多注意"
 
         # 判斷tickbars總成交量的量增減
         if len(self.list_temp_tickbars_total_volume) > 1 and self.list_temp_tickbars_total_volume[-2] < self.list_temp_tickbars_total_volume[-1]:
@@ -501,112 +501,115 @@ class TradingStrategy:
                 # mark_temp_small_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
                 # temp = "疑打底"
                 self.suspected_buy = True
+            new_choices = [s.strip()
+                               for s in self.fibonacci_sell_str.split(":")]
+            if self.suspected_sell == True and temp_highest_arrow == "↓" and  int(new_choices[1])>self.temp_howeverHighest_avg_price:
+                self.trading_sell = True
+                # self.trading_buy = False
+                mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.GREEN"
+                self.stopLoss_sell = self.highest_price+1
+                profit_1 = self.list_close_price[-1] - \
+                    (abs(self.stopLoss_sell-self.list_close_price[-1])+2)
+                profit_2 = self.list_close_price[-1] - \
+                    ((abs(self.stopLoss_sell-self.list_close_price[-1])+2)*2)
+                profit_3 = self.list_close_price[-1] - \
+                    ((abs(self.stopLoss_sell-self.list_close_price[-1])+2)*3)
 
-        if self.suspected_sell == True and temp_highest_arrow == "↓" and  self.temp_tickbars_avg_price<self.temp_howeverHighest_avg_price:
-            self.trading_sell = True
-            # self.trading_buy = False
-            mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.GREEN"
-            self.stopLoss_sell = self.highest_price+1
-            profit_1 = self.list_close_price[-1] - \
-                (abs(self.stopLoss_sell-self.list_close_price[-1])+2)
-            profit_2 = self.list_close_price[-1] - \
-                ((abs(self.stopLoss_sell-self.list_close_price[-1])+2)*2)
-            profit_3 = self.list_close_price[-1] - \
-                ((abs(self.stopLoss_sell-self.list_close_price[-1])+2)*3)
+                cols = self.frame.signalGrid.GetNumberCols()
+                for c in range(cols):
+                    self.frame.signalGrid.SetCellTextColour(0, c, wx.GREEN)
+                self.frame.signalGrid.SetCellValue(
+                    0, 0, str(int(self.list_close_price[-1])))
+                self.frame.signalGrid.SetCellValue(
+                    0, 1, str(int(self.stopLoss_sell)))
+                self.frame.signalGrid.SetCellValue(0, 2, str(int(profit_1)))
+                self.frame.signalGrid.SetCellValue(0, 3, str(int(profit_2)))
+                self.frame.signalGrid.SetCellValue(0, 4, str(int(profit_3)))
 
-            cols = self.frame.signalGrid.GetNumberCols()
-            for c in range(cols):
-                self.frame.signalGrid.SetCellTextColour(0, c, wx.GREEN)
-            self.frame.signalGrid.SetCellValue(
-                0, 0, str(int(self.list_close_price[-1])))
-            self.frame.signalGrid.SetCellValue(
-                0, 1, str(int(self.stopLoss_sell)))
-            self.frame.signalGrid.SetCellValue(0, 2, str(int(profit_1)))
-            self.frame.signalGrid.SetCellValue(0, 3, str(int(profit_2)))
-            self.frame.signalGrid.SetCellValue(0, 4, str(int(profit_3)))
+                self.fibonacci_chkSell_str = self.fibonacci_sell_str
+                self.profit_sell_str = f"{int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
 
-            self.fibonacci_chkSell_str = self.fibonacci_sell_str
-            self.profit_sell_str = f"{int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
+                if self.frame.chkSell.IsChecked():
+                    new_choices = [s.strip()
+                                for s in self.fibonacci_chkSell_str.split(":")]
+                    self.frame.price_combo.SetItems(new_choices)
+                    self.frame.price_combo.SetSelection(3)
 
-            if self.frame.chkSell.IsChecked():
-                new_choices = [s.strip()
-                               for s in self.fibonacci_chkSell_str.split(":")]
-                self.frame.price_combo.SetItems(new_choices)
-                self.frame.price_combo.SetSelection(3)
+                temp = "進場空"
+                self.entry_price_sell = int(self.list_close_price[-1])  # 記錄空單進場價
+                self.suspected_sell = False
+                self.sell_signal = True
+                if self.frame.chkSell.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
+                    val = self.frame.price_combo.GetString(
+                        self.frame.price_combo.GetSelection())
+                    price = int(val) if val.isdigit() else 0
+                    self.frame.OnOrderBtn(
+                        event=None, S_Buys="S", price=price, offset="0")
 
-            temp = "進場空"
-            self.entry_price_sell = int(self.list_close_price[-1])  # 記錄空單進場價
-            self.suspected_sell = False
-            self.sell_signal = True
-            if self.frame.chkSell.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
-                val = self.frame.price_combo.GetString(
-                    self.frame.price_combo.GetSelection())
-                price = int(val) if val.isdigit() else 0
-                self.frame.OnOrderBtn(
-                    event=None, S_Buys="S", price=price, offset="0")
+                if self.frame.isPlaySound.GetValue() == True:
+                    threading.Thread(target=winsound.PlaySound, args=(
+                        "woo.wav", winsound.SND_FILENAME), daemon=True).start()
 
-            if self.frame.isPlaySound.GetValue() == True:
-                threading.Thread(target=winsound.PlaySound, args=(
-                    "woo.wav", winsound.SND_FILENAME), daemon=True).start()
+                if self.frame.isSMS.GetValue() == True:
+                    bot_message = f"{MatchTime}  放空進場: {int(self.list_close_price[-1])}  止損: {int(self.stopLoss_sell)}  停利: {int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
+                    threading.Thread(target=self.telegram_bot_sendtext, args=(
+                        bot_message,), daemon=True).start()
 
-            if self.frame.isSMS.GetValue() == True:
-                bot_message = f"{MatchTime}  放空進場: {int(self.list_close_price[-1])}  止損: {int(self.stopLoss_sell)}  停利: {int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
-                threading.Thread(target=self.telegram_bot_sendtext, args=(
-                    bot_message,), daemon=True).start()
+            new_choices = [s.strip()
+                               for s in self.fibonacci_buy_str.split(":")]
+            if self.suspected_buy == True and temp_lowest_arrow == "↑" and  int(new_choices[1])<self.temp_howeverLowest_avg_price:
+                self.trading_buy = True
+                # self.trading_sell = False
+                mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
+                self.stopLoss_buy = self.lowest_price-1
+                profit_1 = self.list_close_price[-1] + \
+                    (abs(self.stopLoss_buy-self.list_close_price[-1])+2)
+                profit_2 = self.list_close_price[-1] + \
+                    ((abs(self.stopLoss_buy-self.list_close_price[-1])+2)*2)
+                profit_3 = self.list_close_price[-1] + \
+                    ((abs(self.stopLoss_buy-self.list_close_price[-1])+2)*3)
 
-        if self.suspected_buy == True and temp_lowest_arrow == "↑" and  self.temp_tickbars_avg_price>self.temp_howeverLowest_avg_price:
-            self.trading_buy = True
-            # self.trading_sell = False
-            mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
-            self.stopLoss_buy = self.lowest_price-1
-            profit_1 = self.list_close_price[-1] + \
-                (abs(self.stopLoss_buy-self.list_close_price[-1])+2)
-            profit_2 = self.list_close_price[-1] + \
-                ((abs(self.stopLoss_buy-self.list_close_price[-1])+2)*2)
-            profit_3 = self.list_close_price[-1] + \
-                ((abs(self.stopLoss_buy-self.list_close_price[-1])+2)*3)
+                cols = self.frame.signalGrid.GetNumberCols()
+                for c in range(cols):
+                    self.frame.signalGrid.SetCellTextColour(1, c, wx.RED)
+                self.frame.signalGrid.SetCellValue(
+                    1, 0, str(int(self.list_close_price[-1])))
+                self.frame.signalGrid.SetCellValue(
+                    1, 1, str(int(self.stopLoss_buy)))
+                self.frame.signalGrid.SetCellValue(1, 2, str(int(profit_1)))
+                self.frame.signalGrid.SetCellValue(1, 3, str(int(profit_2)))
+                self.frame.signalGrid.SetCellValue(1, 4, str(int(profit_3)))
 
-            cols = self.frame.signalGrid.GetNumberCols()
-            for c in range(cols):
-                self.frame.signalGrid.SetCellTextColour(1, c, wx.RED)
-            self.frame.signalGrid.SetCellValue(
-                1, 0, str(int(self.list_close_price[-1])))
-            self.frame.signalGrid.SetCellValue(
-                1, 1, str(int(self.stopLoss_buy)))
-            self.frame.signalGrid.SetCellValue(1, 2, str(int(profit_1)))
-            self.frame.signalGrid.SetCellValue(1, 3, str(int(profit_2)))
-            self.frame.signalGrid.SetCellValue(1, 4, str(int(profit_3)))
+                self.fibonacci_chkBuy_str = self.fibonacci_buy_str
+                self.profit_buy_str = f"{int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
 
-            self.fibonacci_chkBuy_str = self.fibonacci_buy_str
-            self.profit_buy_str = f"{int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
+                if self.frame.chkBuy.IsChecked():
+                    new_choices = [s.strip()
+                                for s in self.fibonacci_chkBuy_str.split(":")]
+                    self.frame.price_combo.SetItems(new_choices)
+                    self.frame.price_combo.SetSelection(3)
 
-            if self.frame.chkBuy.IsChecked():
-                new_choices = [s.strip()
-                               for s in self.fibonacci_chkBuy_str.split(":")]
-                self.frame.price_combo.SetItems(new_choices)
-                self.frame.price_combo.SetSelection(3)
+                temp = "進場多"
+                self.entry_price_buy = int(self.list_close_price[-1])   # 記錄多單進場價
+                self.suspected_buy = False
+                self.buy_signal = True
+                if self.frame.chkBuy.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
+                    val = self.frame.price_combo.GetString(
+                        self.frame.price_combo.GetSelection())
+                    price = int(val) if val.isdigit() else 0
+                    # S_Buys = self.frame.bscode1_combo.GetString(
+                    #     self.frame.bscode1_combo.GetSelection())[0:1]
+                    self.frame.OnOrderBtn(
+                        event=None, S_Buys="B", price=price, offset="0")
 
-            temp = "進場多"
-            self.entry_price_buy = int(self.list_close_price[-1])   # 記錄多單進場價
-            self.suspected_buy = False
-            self.buy_signal = True
-            if self.frame.chkBuy.IsChecked() and self.frame.acclist_combo.GetCount() != 0:
-                val = self.frame.price_combo.GetString(
-                    self.frame.price_combo.GetSelection())
-                price = int(val) if val.isdigit() else 0
-                # S_Buys = self.frame.bscode1_combo.GetString(
-                #     self.frame.bscode1_combo.GetSelection())[0:1]
-                self.frame.OnOrderBtn(
-                    event=None, S_Buys="B", price=price, offset="0")
+                if self.frame.isPlaySound.GetValue() == True:
+                    threading.Thread(target=winsound.PlaySound, args=(
+                        "woo.wav", winsound.SND_FILENAME), daemon=True).start()
 
-            if self.frame.isPlaySound.GetValue() == True:
-                threading.Thread(target=winsound.PlaySound, args=(
-                    "woo.wav", winsound.SND_FILENAME), daemon=True).start()
-
-            if self.frame.isSMS.GetValue() == True:
-                bot_message = f"{MatchTime}  作多進場: {int(self.list_close_price[-1])}  止損: {int(self.stopLoss_buy)}  停利: {int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
-                threading.Thread(target=self.telegram_bot_sendtext, args=(
-                    bot_message,), daemon=True).start()
+                if self.frame.isSMS.GetValue() == True:
+                    bot_message = f"{MatchTime}  作多進場: {int(self.list_close_price[-1])}  止損: {int(self.stopLoss_buy)}  停利: {int(profit_1)} : {int(profit_2)} : {int(profit_3)}"
+                    threading.Thread(target=self.telegram_bot_sendtext, args=(
+                        bot_message,), daemon=True).start()
 
         if self.pre_TXF_MXF_avg_price > self.TXF_MXF_avg_price and self.temp_price_compare_database:
             self.trending_up = False
