@@ -550,18 +550,19 @@ class AppFrame(wx.Frame):
         ###################################################################################
     
     def OnBacktestData(self, event):
-        try:
-            ts.__init__(frame)
+        try:    
             with wx.FileDialog(self, "選擇檔案", wildcard="回測檔案 (event.log)|event.log",
                             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
                     if fileDialog.ShowModal() == wx.ID_OK:
                         filename = fileDialog.GetPath()
-                        print(f"你選擇的回測檔案是: {filename}")
             direction = "空"  # "多" #
             Is_simulation = 0
             with open(filename, "r") as file:
                 tick_generator = (tick.replace("  [全] MDS=1 Symbol=", ",").replace("=", ",").strip("\n").split(
                     ",") for tick in file if "全" in tick and "tmatqty=-1" not in tick and "open=0" not in tick)
+                self.monitorTradeSignal.Clear()       
+                ts.__init__(frame)
+                print(f"你選擇的回測檔案是: {filename}")
                 for tick in tick_generator:
                     # tick[1]：股票代號 [3]:參考價 [5]:開盤價 [7]:最高價 [9]:最低價 [15]:成交時間 [17]:成交價
                     # tick[19]:單量 [21]:總成交量 [29]:bid [41]:askff

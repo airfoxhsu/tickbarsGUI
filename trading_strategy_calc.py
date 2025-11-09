@@ -367,6 +367,7 @@ class TradingStrategy:
         mark_temp_big_price_color = "Fore.YELLOW + Style.BRIGHT"
         mark_temp_small_price_color = "Fore.YELLOW + Style.BRIGHT"
         mark_temp_close_price_color = "Fore.YELLOW + Style.BRIGHT"
+        mark_temp_compare_avg_price_color = "Fore.YELLOW + Style.BRIGHT"
 
         self.list_close_price.append(self.new_price)
         self.list_temp_tickbars_total_volume.append(
@@ -453,11 +454,13 @@ class TradingStrategy:
         elif len(self.list_temp_tickbars_small_price) > 1 and self.list_temp_tickbars_small_price[-2] <= self.list_temp_tickbars_small_price[-1]:
             mark_temp_small_price_num = 2
 
-        # # 判斷tickbars均價的漲跌
-        # if len(self.list_temp_tickbars_avg_price) > 1 and self.list_temp_tickbars_avg_price[-2] > self.list_temp_tickbars_avg_price[-1]:
-        #     mark_temp_tickbars_avg_price_num = 1
-        # elif len(self.list_temp_tickbars_avg_price) > 1 and self.list_temp_tickbars_avg_price[-2] < self.list_temp_tickbars_avg_price[-1]:
-        #     mark_temp_tickbars_avg_price_num = 2
+        # 比較tickbars均價
+        if self.sell_signal and self.temp_tickbars_avg_price > self.temp_howeverHighest_avg_price:
+            mark_temp_compare_avg_price_color = "Fore.BLACK + Back.WHITE"
+            temp="空注意"
+        elif  self.buy_signal and self.temp_tickbars_avg_price < self.temp_howeverLowest_avg_price:
+            mark_temp_compare_avg_price_color = "Fore.BLACK + Back.WHITE"
+            temp="多注意"
 
         # 判斷tickbars總成交量的量增減
         if len(self.list_temp_tickbars_total_volume) > 1 and self.list_temp_tickbars_total_volume[-2] < self.list_temp_tickbars_total_volume[-1]:
@@ -471,17 +474,17 @@ class TradingStrategy:
 
         if len(self.list_tickbars_tol_time) > 1 and (self.list_tickbars_tol_time[-2]/2) > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_highest_arrow == "↓":
             mark_tol_time_color = "Fore.BLACK + Back.WHITE"
-            mark_speedtime_num = 1
 
         if len(self.list_tickbars_tol_time) > 1 and (self.list_tickbars_tol_time[-2]/2) > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_lowest_arrow == "↑":
             mark_tol_time_color = "Fore.BLACK + Back.WHITE"
-            mark_speedtime_num = 1
 
         if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_highest_arrow == "↓":
             mark_temp_highest_arrow_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
+            mark_speedtime_num = 1
 
         if len(self.list_tickbars_tol_time) > 1 and self.list_tickbars_tol_time[-2] > self.list_tickbars_tol_time[-1] and mark_temp_total_volume_num == 1 and temp_lowest_arrow == "↑":
             mark_temp_lowest_arrow_color = "Fore.BLACK + Style.BRIGHT + Back.WHITE"
+            mark_speedtime_num = 1
 
         if mark_speedtime_num == 1:
             # if self.is_dayhigh and mark_temp_big_price_num == 1 and mark_temp_small_price_num == 1 and temp_up_down_str == "↓" and mark_temp_close_avg_price_num == 1:
@@ -499,7 +502,7 @@ class TradingStrategy:
                 # temp = "疑打底"
                 self.suspected_buy = True
 
-        if self.suspected_sell == True and temp_highest_arrow == "↓":
+        if self.suspected_sell == True and temp_highest_arrow == "↓" and  self.temp_tickbars_avg_price<self.temp_howeverHighest_avg_price:
             self.trading_sell = True
             # self.trading_buy = False
             mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.GREEN"
@@ -551,7 +554,7 @@ class TradingStrategy:
                 threading.Thread(target=self.telegram_bot_sendtext, args=(
                     bot_message,), daemon=True).start()
 
-        if self.suspected_buy == True and temp_lowest_arrow == "↑":
+        if self.suspected_buy == True and temp_lowest_arrow == "↑" and  self.temp_tickbars_avg_price>self.temp_howeverLowest_avg_price:
             self.trading_buy = True
             # self.trading_sell = False
             mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
@@ -614,36 +617,36 @@ class TradingStrategy:
 
             if temp == "進場空":
                 print(
-                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {eval(mark_temp_compare_avg_price_color)}{int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}放空 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_sell_str}   止損: {int(self.stopLoss_sell)}   停利: {self.profit_sell_str}{Style.RESET_ALL}")
 
             elif temp == "進場多":
                 print(
-                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {eval(mark_temp_compare_avg_price_color)}{int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}買進 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_buy_str}   止損: {int(self.stopLoss_buy)}   停利: {self.profit_buy_str}{Style.RESET_ALL}")
             else:
                 print(
-                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.GREEN}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {eval(mark_temp_compare_avg_price_color)}{int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
 
         elif self.pre_TXF_MXF_avg_price < self.TXF_MXF_avg_price and self.temp_price_compare_database:
             self.trending_up = True
             self.trending_down = False
             if temp == "進場多":
                 print(
-                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {eval(mark_temp_compare_avg_price_color)}{int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.RED}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}買進 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_buy_str}   止損: {int(self.stopLoss_buy)}   停利: {self.profit_buy_str}{Style.RESET_ALL}")
             elif temp == "進場空":
                 print(
-                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現:{Style.RESET_ALL}{eval(mark_temp_close_price_color)} {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {eval(mark_temp_compare_avg_price_color)}{int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.GREEN}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
                 print(
                     f"{Fore.YELLOW}{Style.BRIGHT}{MatchTime}{Style.RESET_ALL}  {Fore.GREEN}{Style.BRIGHT}放空 {int(self.list_close_price[-1])}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}費波: {self.fibonacci_sell_str}   止損: {int(self.stopLoss_sell)}   停利: {self.profit_sell_str}{Style.RESET_ALL}")
 
             else:
                 print(
-                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d}  {int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
+                    f"{Fore.RED}{Style.BRIGHT}{MatchTime}  {(self.TXF_MXF_avg_price):>9.4f}{Style.RESET_ALL}  {eval(mark_tol_time_color)}{tol_time_str}{Style.RESET_ALL}  {eval(mark_temp_big_price_color)}{int(self.list_temp_tickbars_big_price[-1]):<5d}{Style.RESET_ALL} : {eval(mark_temp_small_price_color)}{int(self.list_temp_tickbars_small_price[-1]):<5d}{Style.RESET_ALL}  {eval(mark_temp_highest_arrow_color)}{temp_highest_arrow}{Style.RESET_ALL}  {eval(mark_temp_lowest_arrow_color)}{temp_lowest_arrow}{Style.RESET_ALL}  {Fore.RED}{Style.BRIGHT}現: {int(self.new_price)}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_tickbars_total_volume):>5d} : {eval(mark_temp_compare_avg_price_color)}{int(self.temp_tickbars_avg_price):<5d}{Style.RESET_ALL}  {Fore.YELLOW}{Style.BRIGHT}{int(self.temp_howeverHighest_avg_price):<5d} : {int(self.temp_howeverLowest_avg_price):<5d}{Style.RESET_ALL}  高: {int(self.highest_price)}  低: {int(self.lowest_price)}  {Fore.YELLOW}{Style.BRIGHT}{temp}{Style.RESET_ALL}")
 
         self.temp_price_compare_database = {}
         self.temp_tickbars_total_volume = 0
