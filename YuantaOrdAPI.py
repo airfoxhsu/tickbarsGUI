@@ -101,7 +101,8 @@ class AppFrame(wx.Frame):
         self.futno1_combo.SetSelection(1)
 
         wx.StaticText(pnl, label='價格', pos=(271, 130))
-        self.price_combo = wx.Choice(pnl, choices=['0'], pos=(310, 127), size=(70, 23))
+        self.price_combo = wx.Choice(
+            pnl, choices=['0'], pos=(310, 127), size=(70, 23))
         self.price_combo.SetSelection(0)
 
         wx.StaticText(pnl, label='數量', pos=(391, 130))
@@ -144,12 +145,12 @@ class AppFrame(wx.Frame):
 
         order = wx.Button(pnl, wx.ID_ANY, label='下單',
                           pos=(578, 126), size=(50, 25))
-        val = self.price_combo.GetString(self.price_combo.GetSelection())   
+        val = self.price_combo.GetString(self.price_combo.GetSelection())
         price = int(val) if val.isdigit() else 0
         S_Buys = self.bscode1_combo.GetString(
             self.bscode1_combo.GetSelection())[0:1]
         offset = self.offset_combo.GetString(
-                self.offset_combo.GetSelection())[0:1],
+            self.offset_combo.GetSelection())[0:1],
         order.Bind(wx.EVT_BUTTON, partial(
             self.OnOrderBtn, S_Buys=S_Buys, price=price, offset=offset))
 
@@ -245,7 +246,7 @@ class AppFrame(wx.Frame):
         self.rbAm.SetValue(True) if self.is_day() else self.rbPm.SetValue(True)
 
         logonQuote = wx.Button(pnl, wx.ID_ANY, label='登入',
-                             pos=(1080, 22), size=(40, 30))
+                               pos=(1080, 22), size=(40, 30))
         logonQuote.Bind(wx.EVT_BUTTON, self.ConnectionQuote)
 
         register = wx.Button(pnl, wx.ID_ANY, label='註冊',
@@ -516,7 +517,8 @@ class AppFrame(wx.Frame):
 
         userquery = wx.Button(pnl, wx.ID_ANY, label='查詢',
                               pos=(580, 455), size=(70, 25))
-        userquery.Bind(wx.EVT_BUTTON, partial(self.OnUserDefineBtn, method="通用"))
+        userquery.Bind(wx.EVT_BUTTON, partial(
+            self.OnUserDefineBtn, method="通用"))
 
         wx.StaticText(pnl, label='未平倉口數：', pos=(560, 500))
         self.qtyLabel = wx.StaticText(pnl, label='未連', pos=(635, 500))
@@ -532,53 +534,134 @@ class AppFrame(wx.Frame):
 
         ###################################################################################
         wx.StaticText(pnl, label='錯失訊號', pos=(580, 200))
-        self.missedSignal_combo = wx.Choice(pnl, choices=['無','進場空', '進場多'], pos=(560, 220), size=(70, 25))
+        self.missedSignal_combo = wx.Choice(
+            pnl, choices=['無', '進場空', '進場多'], pos=(560, 220), size=(70, 25))
         self.missedSignal_combo.SetSelection(0)
         self.chkSignal = wx.CheckBox(pnl, pos=(635, 223))
         self.chkSignal.Bind(wx.EVT_CHECKBOX, self.OnMissedSignal)
-        # self.chkSignal.SetValue(False)  
-        
+        # self.chkSignal.SetValue(False)
+
         ###################################################################################
 
         ###################################################################################
         wx.StaticText(pnl, label='真實均價', pos=(580, 260))
-        self.avgPrice = wx.TextCtrl(pnl,value="0", pos=(560, 280), size=(90, 25),style=wx.TE_CENTER)
+        self.avgPrice = wx.TextCtrl(pnl, value="0", pos=(
+            560, 280), size=(90, 25), style=wx.TE_CENTER)
         ###################################################################################
 
         # 連線行情
-        self.ConnectionQuote(event=None)
+        self.ConnectionQuote(None)
         ###################################################################################
-    
+
     def OnBacktestData(self, event):
-        try:    
-            with wx.FileDialog(self, "選擇檔案", wildcard="回測檔案 (event.log)|event.log",
-                            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
-                    if fileDialog.ShowModal() == wx.ID_OK:
-                        filename = fileDialog.GetPath()
-            direction = "空"  # "多" #
-            Is_simulation = 0
-            with open(filename, "r") as file:
-                tick_generator = (tick.replace("  [全] MDS=1 Symbol=", ",").replace("=", ",").strip("\n").split(
-                    ",") for tick in file if "全" in tick and "tmatqty=-1" not in tick and "open=0" not in tick)
-                self.monitorTradeSignal.Clear()       
-                ts.__init__(frame)
-                print(f"你選擇的回測檔案是: {filename}")
-                for tick in tick_generator:
-                    # tick[1]：股票代號 [3]:參考價 [5]:開盤價 [7]:最高價 [9]:最低價 [15]:成交時間 [17]:成交價
-                    # tick[19]:單量 [21]:總成交量 [29]:bid [41]:askff
+        # 1. 選檔案（只管 UI）
+        with wx.FileDialog(
+            self,
+            "選擇檔案",
+            wildcard="回測檔案 (event.log)|event.log",
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST
+        ) as dlg:
+            if dlg.ShowModal() != wx.ID_OK:
+                return  # 使用者取消就乾淨離開
+            filename = dlg.GetPath()
+
+        direction = "空"      # 未來可做成參數
+        is_simulation = 0     # 命名小寫，易讀
+
+        # 狀態：記住目前是哪一個交易時段
+        current_session = None      # "day" / "night" / None
+        need_reset = False          # 用來標記下一個有效時段要重置
+
+        def get_session(t):
+            """
+            用 tick[15] 的時間數字判斷屬於哪個交易時段：
+            - 日盤: 08:45:00 ~ 13:45:00
+            - 夜盤: 15:00:00 ~ 次日 05:00:00
+            其他時間 (13:45~15:00、05:00~08:45) 回傳 None
+            """
+            # 這裡假設 t 是類似 84500000000, 134500000000 這種 HHMMSSxxxxxx 格式
+            DAY_START = 84500000000
+            DAY_END = 134500000000
+            NIGHT_START = 150000000000
+            NIGHT_END = 50000000000    # 凌晨 05:00:00 以前
+
+            if DAY_START <= t <= DAY_END:
+                return "day"
+            # 夜盤是「下午三點以後」或「凌晨五點以前」（跨日）
+            if t >= NIGHT_START or t <= NIGHT_END:
+                return "night"
+            return None  # 午休或非交易時間
+
+        # 2. 執行回測主流程（用 try，但不要吃光）
+        try:
+            self.monitorTradeSignal.Clear()
+            
+            ts.__init__(frame)
+
+            print(f"你選擇的回測檔案是: {filename}")
+
+            with open(filename, "r") as f:
+                for raw in f:
+                    # 先過濾不需要的行
+                    if "全" not in raw or "tmatqty=-1" in raw or "open=0" in raw:
+                        continue
+
+                    # 字串轉 tick list
+                    line = (
+                        raw.replace("  [全] MDS=1 Symbol=", ",")
+                        .replace("=", ",")
+                        .strip("\n")
+                    )
+                    tick = line.split(",")
+
+                    # 防呆：長度不夠就跳過
+                    if len(tick) <= 29:
+                        print(f"格式異常，略過: {raw.strip()}")
+                        continue
+
                     try:
-                        if int(tick[15]) <= 134500000000 and tick[29] != "0":
-                            # 初始化大小台資料庫、計算大小台個別總量、辨別內外盤、計算每一價位的成交量及量差
-                            ts.execate_TXF_MXF(direction, tick[1], tick[3], tick[5], tick[7], tick[9], tick[15],
-                                            tick[17], tick[19], tick[21], Is_simulation)
-                        
+                        tick_time = int(tick[15])
+                        session = get_session(tick_time)
+
+                         # 不在交易時間：標記需要重置，然後略過
+                        if session is None:
+                            if current_session is not None:
+                                # 離開一個時段 → 等下一個合法時段出現時重置
+                                need_reset = True
+                            continue
+
+                        # 進入新時段：重置策略狀態（清空原始數據）
+                        if need_reset or session != current_session:
+                            ts.__init__(frame)
+                            print(f"=== 新開 {session} 盤，重置策略狀態 ===")
+                            current_session = session
+                            need_reset = False
+
+                        # 時間 + bid 檢查
+                        # if int(tick[15]) <= 134500000000 and tick[29] != "0":
+                         # 這筆 tick 要不要進策略
+                        if tick[29] != "0":
+                            ts.execate_TXF_MXF(
+                                direction,
+                                tick[1],  # 股票代號
+                                tick[3],  # 參考價
+                                tick[5],  # 開盤價
+                                tick[7],  # 最高價
+                                tick[9],  # 最低價
+                                tick[15],  # 成交時間
+                                tick[17],  # 成交價
+                                tick[19],  # 單量
+                                tick[21],  # 總成交量
+                                is_simulation
+                            )
                     except Exception as e:
-                        print(e)
-                        # pass
-        
+                        # 單筆 tick 的錯誤，要看得到
+                        print(f"處理單筆 tick 發生錯誤: {e} | 原始資料: {raw.strip()}")
+
         except Exception as e:
-                pass
-        
+            # 外層錯誤也要印出來，不要 pass
+            print(f"回測執行錯誤: {e}")
+
     def OnQtyBtn(self, event):
         self.qtyLabel.SetLabel("QQ")
 
@@ -629,7 +712,8 @@ class AppFrame(wx.Frame):
     def OnMissedSignal(self, event):
         cb = event.GetEventObject()
         if self.chkSignal.IsChecked():
-            val = self.missedSignal_combo.GetString(self.missedSignal_combo.GetSelection())
+            val = self.missedSignal_combo.GetString(
+                self.missedSignal_combo.GetSelection())
             if val == "進場空" and self.chkSell.IsChecked():
                 ts.trading_sell = True
                 self.Logmessage(f"錯失訊號: {val} trading_sell = True")
@@ -651,7 +735,8 @@ class AppFrame(wx.Frame):
             self.bscode1_combo.SetSelection(1)  # S-賣出
             self.bscode2_combo.SetSelection(0)  # B-買進
             if ts.fibonacci_chkSell_str and ts.fibonacci_chkSell_str.strip() != "0":
-                new_choices = [s.strip() for s in ts.fibonacci_chkSell_str.split(":")]
+                new_choices = [s.strip()
+                               for s in ts.fibonacci_chkSell_str.split(":")]
                 self.price_combo.SetItems(new_choices)
                 self.price_combo.SetSelection(3)
             else:
@@ -663,13 +748,14 @@ class AppFrame(wx.Frame):
             self.bscode1_combo.SetSelection(0)  # B-買進
             self.bscode2_combo.SetSelection(1)  # S-賣出
             if ts.fibonacci_chkBuy_str and ts.fibonacci_chkBuy_str.strip() != "0":
-                new_choices = [s.strip() for s in ts.fibonacci_chkBuy_str.split(":")]
+                new_choices = [s.strip()
+                               for s in ts.fibonacci_chkBuy_str.split(":")]
                 self.price_combo.SetItems(new_choices)
                 self.price_combo.SetSelection(3)
             else:
                 new_choices = ["0"]  # 或給預設選單
                 self.price_combo.SetItems(new_choices)
-                self.price_combo.SetSelection(0)    
+                self.price_combo.SetSelection(0)
         else:
             new_choices = ["0"]  # 或給預設選單
             self.price_combo.SetItems(new_choices)
@@ -709,7 +795,7 @@ class AppFrame(wx.Frame):
                 user_params = f'Func={func}|bhno={bhno}|acno={ae_no}|suba=|FC=N'
             elif func == "FA003":
                 user_params = f'Func={func}|bhno={bhno}|acno={ae_no}|suba=|type=1|currency=TWD'
-        
+
         self.last_userdefine_source = "userquery"
         UserDefineJob(Job.USERDEFINE, user_params, func)
 
@@ -723,7 +809,7 @@ class AppFrame(wx.Frame):
         bhno = vars[1]
         account = vars[2]
         ae_no = vars[3]
-        OrderJob(Job.ORDER, bhno, account, ae_no, S_Buys, price)
+        OrderJob(Job.ORDER, bhno, account, ae_no, S_Buys, price, offset)
 
     def OnOrdQueryBtn(self, event):
         if self.acclist_combo.GetCount() == 0:
@@ -776,28 +862,42 @@ class AppFrame(wx.Frame):
             self.bscode2_combo.Show(False)
 
     def Logmessage(self, msg):
-        self.statusMessage.Append(msg)
-        item_count = self.statusMessage.GetCount()
-        if item_count > 0:
-            self.statusMessage.EnsureVisible(self.statusMessage.GetCount()-1)
+        # 如果是 Exception，就轉成字串
+        if isinstance(msg, Exception):
+            msg = f"[錯誤] {msg}"
+
+        # 確保是字串
+        msg = str(msg)
+        try:
+            self.statusMessage.Append(msg)
+            item_count = self.statusMessage.GetCount()
+            if item_count > 0:
+                self.statusMessage.EnsureVisible(
+                    self.statusMessage.GetCount()-1)
+        except Exception as e:
+            # 最後防線：避免 logging 再丟例外導致整個系統死掉
+            print("Logmessage 失敗:", e, "| 原始訊息:", msg)
 
     def UpdateDayNight(self):
-        config = load_json("./config.json")
-        self.Username = config["username"]
-        self.Password = config["password"]
-        self.Host = "203.66.93.84"
-        if self.is_day() and not self.is_day_port():
-            self.Port = 443
-            msg = "Change connection port to 443."
-            frame.Logmessage(msg)
-            frame.ConnectionQuote(event=None)
-        elif not self.is_day() and self.is_day_port():
-            self.Port = 442
-            msg = "Change connection port to 442."
-            frame.Logmessage(msg)
-            frame.ConnectionQuote(event=None)
-
-        time.sleep(1)
+        # config = load_json("./config.json")
+        # self.Username = config["username"]
+        # self.Password = config["password"]
+        # self.Host = "203.66.93.84"
+        while True:
+            if self.is_day() and not self.is_day_port():
+                self.Port = 443
+                # msg = "Change connection port to 443."
+                msg = "切換日盤port to 443並初始化數據."
+                self.Logmessage(msg)
+                ts.__init__(frame)
+                self.ConnectionQuote(None)
+            elif not self.is_day() and self.is_day_port():
+                self.Port = 442
+                msg = "切換夜盤port to 442並初始化數據."
+                self.Logmessage(msg)
+                ts.__init__(frame)
+                self.ConnectionQuote(None)
+            time.sleep(10)
 
     def ConnectionQuote(self, event=None):
         config = load_json("./config.json")
@@ -823,10 +923,10 @@ class AppFrame(wx.Frame):
         07:00~14:45 - Day
         14:45~07:00 - Night
         """
-        # now = self.get_time()
-        now = datetime.datetime.now()
-        day_begin = now.replace(hour=7, minute=0, second=0)
-        day_end = now.replace(hour=14, minute=30, second=0)
+        now = self.get_time()
+        # now = datetime.datetime.now()
+        day_begin = now.replace(hour=7, minute=50, second=0)
+        day_end = now.replace(hour=14, minute=45, second=0)
 
         if now < day_begin:
             return False
@@ -858,8 +958,8 @@ class AppFrame(wx.Frame):
     def get_time(self):
         """Get the absolute time of UTC+8.「中原標準時間」"""
         d = datetime.timedelta(hours=8)
-        # t = datetime.datetime.utcnow()
-        t = datetime.datetime.now()
+        t = datetime.datetime.utcnow()
+        # t = datetime.datetime.now()
         t += d
         return t
 
@@ -885,9 +985,10 @@ class AppFrame(wx.Frame):
 
     def XF(self, code):
         return f"{code}{self.XXF()}"
-        
+
     def reset_waitMinuteToSMS(self):
         self.waitMinuteToSMS = True
+
 
 class switch(object):
     def __init__(self, value):
@@ -1026,7 +1127,7 @@ class YuantaQuoteEvents(object):
                 msg = "Reconnection beyond trade time will wait for 1 minutes"
                 frame.Logmessage(msg)
                 time.sleep(60)
-            frame.UpdateDayNight()
+            frame.ConnectionQuote(None)
 
         if Status != 2:
             return
@@ -1246,7 +1347,7 @@ class StockBot:
         ret = self.Yuanta.YuantaOrd.UserDefinsFunc(params, workid)
         # frame.Logmessage('user define ret = {}'.format(ret))
 
-    def send_order(self, bhon, account, ae_no ,S_Buys ,price ,offset):
+    def send_order(self, bhon, account, ae_no, S_Buys, price, offset):
         ## 同步、非同步##
         if frame.wait.GetValue() == True:
             self.Yuanta.YuantaOrd.SetWaitOrdResult(1)
@@ -1399,6 +1500,7 @@ class StockBot:
 class YuantaOrdEvents(object):
     def __init__(self, parent):
         self.parent = parent
+
     def OnLogonS(self, this, TLinkStatus, AccList, Casq, Cast):
         frame.Logmessage('OnLogonS {},{},{},{}'.format(
             TLinkStatus, AccList, Casq, Cast))
@@ -1452,9 +1554,9 @@ class YuantaOrdEvents(object):
 
     def OnUserDefinsFuncResult(self, this, RowCount, Results, WorkID):
         try:
-        # data = dict(p.split("=") for p in Results.split("|"))
-        # parts = [p.split("=") for p in Results.split("|") if "=" in p]
-        # data = dict((k, v) for k, v in parts if len((k, v)) == 2)
+            # data = dict(p.split("=") for p in Results.split("|"))
+            # parts = [p.split("=") for p in Results.split("|") if "=" in p]
+            # data = dict((k, v) for k, v in parts if len((k, v)) == 2)
             data = {}
             for seg in Results.split("|"):
                 if "=" in seg:  # 只處理有等號的
@@ -1478,20 +1580,20 @@ class YuantaOrdEvents(object):
         except Exception as e:
             frame.Logmessage(f"OnUserDefinsFuncResult error: {e}")
         finally:
-            frame.last_userdefine_source = None           
+            frame.last_userdefine_source = None
 
     # 自動委託回報 Event
     def OnOrdRptF(self, this, Omkt, Mktt, Cmbf, Statusc, Ts_Code, Ts_Msg, Bhno, AcNo,
                   Suba, Symb, Scnam, O_Kind, O_Type, Buys, S_Buys, O_Prc, O_Qty, Work_Qty, Kill_Qty,
                   Deal_Qty, Order_No, T_Date, O_Date, O_Time,
                   O_Src, O_Lin, A_Prc, Oseq_No, Err_Code,
-                  Err_Msg, R_Time, D_Flag):        
+                  Err_Msg, R_Time, D_Flag):
         # 檢查庫存
-        # frame.OnUserDefineBtn(event=None, method="庫存")   
+        # frame.OnUserDefineBtn(event=None, method="庫存")
         # 檢查庫存  手動呼叫事件函式
         # frame.isAutoPosition.SetValue(True)
         # frame.OnAutoPositionCheck(None)
-        
+
         msg = 'Omkt={},Mktt={},Cmbf={},Statusc={},Ts_Code={},Ts_Msg={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},O_Type={},Buys={},S_Buys={},O_Prc={},O_Qty={},Work_Qty={},Kill_Qty={},Deal_Qty={},Order_No={},T_Date={},O_Date={},O_Time={},O_Src={},O_Lin={},A_Prc={},Oseq_No={},Err_Code={},Err_Msg={},R_Time={},D_Flag={}'.format(Omkt.strip(), Mktt.strip(), Cmbf.strip(), Statusc.strip(), Ts_Code.strip(), Ts_Msg.strip(
         ), Bhno.strip(), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), O_Type.strip(), Buys.strip(), S_Buys.strip(), O_Prc.strip(), O_Qty.strip(), Work_Qty.strip(), Kill_Qty.strip(), Deal_Qty.strip(), Order_No.strip(), T_Date.strip(), O_Date.strip(), O_Time.strip(), O_Src.strip(), O_Lin.strip(), A_Prc.strip(), Oseq_No.strip(), Err_Code.strip(), Err_Msg.strip(), R_Time.strip(), D_Flag.strip())
         frame.OrdQueryRpt.Append(msg)
@@ -1505,10 +1607,10 @@ class YuantaOrdEvents(object):
                   S_Buys, O_Prc, A_Prc, O_Qty, Deal_Qty,
                   T_Date, D_Time, Order_No, O_Src, O_Lin,
                   Oseq_No):
-        # 檢查庫存  
+        # 檢查庫存
         # frame.OnUserDefineBtn(event=None, method="庫存")
         # # 檢查庫存  手動呼叫事件函式
-        if frame.isAutoPosition.GetValue()==False:
+        if frame.isAutoPosition.GetValue() == False:
             frame.isAutoPosition.SetValue(True)
             frame.OnAutoPositionCheck(None)
 
@@ -1642,7 +1744,7 @@ class PositionWatcher:
     def __init__(self, interval=30):
         self.interval = interval
         self.stop_flag = threading.Event()
-        self.thread = None       
+        self.thread = None
         self.user_params = None
 
     def start(self):
@@ -1664,7 +1766,7 @@ class PositionWatcher:
         """停止背景查倉執行緒"""
         if self.thread:
             self.stop_flag.set()
-            frame.qtyLabel.SetLabel("未連")   
+            frame.qtyLabel.SetLabel("未連")
             frame.Logmessage("🛑 已停止自動查倉（執行緒將自行結束）")
             wx.CallLater(500, self._check_thread_done)
 
@@ -1677,14 +1779,13 @@ class PositionWatcher:
 
     def _loop(self):
         """執行緒主迴圈"""
-        while not self.stop_flag.is_set() and frame.acclist_combo.GetCount() != 0: # and not frame.last_userdefine_source:
+        while not self.stop_flag.is_set() and frame.acclist_combo.GetCount() != 0:  # and not frame.last_userdefine_source:
             frame.last_userdefine_source = "autoposition"
             # frame.OnUserDefineBtn(event=None, method="庫存")
             UserDefineJob(Job.USERDEFINE, self.user_params, "FA001")
             time.sleep(self.interval)
         frame.Logmessage("查倉執行緒結束 (正常退出或條件不符)")
         # self.thread = None
-        
 
 
 def DoJob(Bot, x):    # x表示各類Job
@@ -1699,7 +1800,8 @@ def DoJob(Bot, x):    # x表示各類Job
             Bot.user_define(x.params, x.workid)
             break
         if case(Job.ORDER):
-            Bot.send_order(x.bhno, x.account, x.ae_no ,x.S_Buys ,x.price ,x.offset)
+            Bot.send_order(x.bhno, x.account, x.ae_no,
+                           x.S_Buys, x.price, x.offset)
             break
         if case(Job.ORDQUERY):
             Bot.send_ordQuery(x.bhno, x.account, x.ae_no)
@@ -1755,8 +1857,8 @@ if __name__ == "__main__":
     frame.SetPosition((10, 10))
     frame.Show(True)
     Bot = StockBot(frame.Handle)
-    # ts = trading_strategy_calc_refactored_2.TradingStrategy(frame)
-    ts= trading_strategy_calc.TradingStrategy(frame)
+    ts = trading_strategy_calc.TradingStrategy(frame)
+    # threading.Thread(target=frame.UpdateDayNight, daemon=True).start()
     app.MainLoop(run_job)
 
 """
