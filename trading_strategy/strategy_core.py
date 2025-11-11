@@ -208,6 +208,7 @@ class TradingStrategy:
             h, m, s, ms = parse_time_string(MatchTime)
             now_ms = to_ms(h, m, s, ms)
             diff = abs(now_ms - database["pre_matchtime"])
+            # 過濾隔夜值 23:59:59.999 ~ 00:00:00.000
             if diff < 50000000:
                 self.matchtime += diff
             database["pre_matchtime"] = now_ms
@@ -250,6 +251,15 @@ class TradingStrategy:
             self.trending_up = False
             self.trending_down = True
             self._reset_temp_zone(high=False)
+        
+        # 檢查移動停利
+        self.order.update_trailing_profit(self.new_price, MatchTime)
+
+        # ✅ 新增：檢查止損觸發（每筆 tick 檢查）
+        self.order.check_stoploss_triggered(int(self.new_price), MatchTime)
+
+        # ✅ 每筆 tick 都檢查是否觸發真實進場（依據先前 1000 筆產生的訊號）
+        self.check_entry_on_tick(MatchTime)
 
         # 均價 vs 現價箭頭
         up_down_str = ""
@@ -326,17 +336,8 @@ class TradingStrategy:
         if self.group_size >= threshold:
             self.show_tickbars(MatchTime, tol_time, tol_time_str)
 
-        # 檢查移動停利
-        self.order.update_trailing_profit(self.new_price)
-
-        # ✅ 新增：檢查止損觸發（每筆 tick 檢查）
-        self.order.check_stoploss_triggered(int(self.new_price), MatchTime)
-
         # 更新 Fibonacci 與建議
         self.calculate_and_update()
-
-        # ✅ 每筆 tick 都檢查是否觸發真實進場（依據先前 1000 筆產生的訊號）
-        self.check_entry_on_tick(MatchTime)
 
     # =========================================================
     # 每筆 tick 依據訊號檢查是否觸發真實進場
@@ -353,7 +354,7 @@ class TradingStrategy:
         # 「如果當前有放空訊號 (sell_signal == True)，並且目前沒有放空持倉 (trading_sell == False)，那就執行下面的放空邏輯。」
         if getattr(self.order, "sell_signal", False) and not getattr(self.order, "trading_sell", False):
             entry = int(getattr(self.order, "entry_price_sell", 0) or 0)
-            if entry > 0 and price >= entry:
+            if entry > 0 and price > entry:
                 self.notifier.log(
                     f"{MatchTime}  放空觸價成交 現價:{price}  觸發價:{entry}",
                     Fore.GREEN + Style.BRIGHT
@@ -361,14 +362,14 @@ class TradingStrategy:
                 if hasattr(self.order, "execute_trade"):
                     self.order.execute_trade(
                         direction="空",
-                        entry_price=entry,
+                        trigger_price=entry,
                         match_time=MatchTime,
                     )
 
         # 作多：等回檔到預設作多價（含）以下
         if getattr(self.order, "buy_signal", False) and not getattr(self.order, "trading_buy", False):
             entry = int(getattr(self.order, "entry_price_buy", 0) or 0)
-            if entry > 0 and price <= entry:
+            if entry > 0 and price < entry:
                 self.notifier.log(
                     f"{MatchTime}  作多觸價成交 現價:{price}  觸發價:{entry}",
                     Fore.RED + Style.BRIGHT
@@ -376,7 +377,7 @@ class TradingStrategy:
                 if hasattr(self.order, "execute_trade"):
                     self.order.execute_trade(
                         direction="多",
-                        entry_price=entry,
+                        trigger_price=entry,
                         match_time=MatchTime,
                     )
 
