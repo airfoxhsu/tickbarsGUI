@@ -329,6 +329,9 @@ class TradingStrategy:
         # 檢查移動停利
         self.order.update_trailing_profit(self.new_price)
 
+        # ✅ 新增：檢查止損觸發（每筆 tick 檢查）
+        self.order.check_stoploss_triggered(int(self.new_price), MatchTime)
+
         # 更新 Fibonacci 與建議
         self.calculate_and_update()
 

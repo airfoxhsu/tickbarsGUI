@@ -92,7 +92,7 @@ class OrderManager:
 
         return label
 
-
+    # === 真實下單 ===    
     def execute_trade(self,
                     direction: str,
                     entry_price: int,
@@ -112,6 +112,7 @@ class OrderManager:
         # === 真實下單 ===
         side = "B" if direction == "多" else "S"
         offset = "0"  # 0: 開倉, 1: 平倉
+        
 
         try:
             if self.frame.acclist_combo.GetCount() != 0:
@@ -268,3 +269,43 @@ class OrderManager:
                     )
                 elif price >= p3:
                     self._exit_takeprofit_all("多", price)
+
+    def check_stoploss_triggered(self, price: int, match_time: str):
+        """檢查是否觸及止損價，若觸發則呼叫 OnOrderBtn 平倉。"""
+        # 放空止損
+        if getattr(self, "trading_sell", False) and getattr(self, "stopLoss_sell", 0):
+            if price >= self.stopLoss_sell:
+                msg = f"{match_time} 🟥 空單觸發止損價 {self.stopLoss_sell}，執行平倉"
+                self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
+                self.trading_sell = False
+                self.sell_signal = False
+                try:
+                    if self.frame.acclist_combo.GetCount() != 0 and self.frame.chkSell.IsChecked():
+                        # 檢查 GUI 上「是否允許自動下單」                        
+                            self.frame.OnOrderBtn(
+                                event=None,
+                                S_Buys="B",   # 買回平倉
+                                price=price,
+                                offset="1"    # 1=平倉
+                            )
+                except Exception:
+                    self.notifier.error("⚠️ 放空止損平倉下單失敗，請檢查 OnOrderBtn。")
+
+        # 作多止損
+        if getattr(self, "trading_buy", False) and getattr(self, "stopLoss_buy", 0):
+            if price <= self.stopLoss_buy:
+                msg = f"{match_time} 🟥 多單觸發止損價 {self.stopLoss_buy}，執行平倉"
+                self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
+                self.trading_buy = False
+                self.buy_signal = False
+                try:
+                    if self.frame.acclist_combo.GetCount() != 0 and self.frame.chkBuy.IsChecked():
+                        # 檢查 GUI 上「是否允許自動下單」                        
+                        self.frame.OnOrderBtn(
+                            event=None,
+                            S_Buys="S",   # 賣出平倉
+                            price=price,
+                            offset="1"
+                    )
+                except Exception:
+                    self.notifier.error("⚠️ 多單止損平倉下單失敗，請檢查 OnOrderBtn。")

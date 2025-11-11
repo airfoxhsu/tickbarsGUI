@@ -1460,8 +1460,9 @@ class StockBot:
             price,
             frame.lots_combo.GetString(
             frame.lots_combo.GetSelection())[0:1],
-            frame.offset_combo.GetString(
-            frame.offset_combo.GetSelection())[0:1],
+            # frame.offset_combo.GetString(
+            # frame.offset_combo.GetSelection())[0:1],
+            offset,
             frame.pritype_combo.GetString(
             frame.pritype_combo.GetSelection())[0:1],
             frame.pritype_cond.GetString(
