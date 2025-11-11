@@ -170,12 +170,16 @@ class OrderManager:
 
         # === 真正執行平倉委託 ===
         try:
-            # offset="1" 表示平倉
-            self.frame.OnOrderBtn(
-                event=None,
-                S_Buys=side,
-                price=int(price),
-                offset="1"
+            if self.frame.acclist_combo.GetCount() != 0:
+                # 檢查 GUI 上「是否允許自動下單」
+                if ((direction == "多" and self.frame.chkBuy.IsChecked()) or
+                        (direction == "空" and self.frame.chkSell.IsChecked())):                   
+                    # offset="1" 表示平倉
+                    self.frame.OnOrderBtn(
+                        event=None,
+                        S_Buys=side,
+                        price=int(price),
+                        offset="1"
             )
         except Exception:
             self.notifier.error("止損平倉下單失敗，請檢查 OnOrderBtn 或價位設定。")
@@ -197,11 +201,15 @@ class OrderManager:
 
         side = "S" if direction == "多" else "B"
         try:
-            self.frame.OnOrderBtn(
-                event=None,
-                S_Buys=side,
-                price=price,
-                offset="1"
+            if self.frame.acclist_combo.GetCount() != 0:
+                # 檢查 GUI 上「是否允許自動下單」
+                if ((direction == "多" and self.frame.chkBuy.IsChecked()) or
+                        (direction == "空" and self.frame.chkSell.IsChecked())):      
+                    self.frame.OnOrderBtn(
+                        event=None,
+                        S_Buys=side,
+                        price=price,
+                        offset="1"
             )
         except Exception:
             self.notifier.error("停利平倉下單失敗，請檢查 OnOrderBtn。")
