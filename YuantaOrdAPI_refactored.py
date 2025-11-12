@@ -555,6 +555,14 @@ class AppFrame(wx.Frame):
         global ts
         ts = TradingStrategy(self)  # 用 GUI Frame 傳給策略模組
 
+        # 所有 UI 初始化完成後加這行
+        self.Bind(wx.EVT_CLOSE, self.OnClose)
+
+    def OnClose(self, event):
+        app = wx.GetApp()
+        if hasattr(app, "keepGoing"):
+            app.keepGoing = False
+        self.Destroy()
 
     def OnBacktestData(self, event):
         # 1. 選檔案（只管 UI）
@@ -599,7 +607,7 @@ class AppFrame(wx.Frame):
         try:
             self.monitorTradeSignal.Clear()
             
-            ts.__init__(frame)
+            # ts.__init__(frame)
 
             print(f"你選擇的回測檔案是: {filename}")
 
@@ -623,9 +631,12 @@ class AppFrame(wx.Frame):
                         continue
 
                     try:
-                        tick_time = int(tick[15])
-                        session = get_session(tick_time)
-
+                        try:
+                            tick_time = int(tick[15])
+                            session = get_session(tick_time)
+                        except ValueError:
+                            continue  # 跳過不是數字的欄位
+                        
                          # 不在交易時間：標記需要重置，然後略過
                         if session is None:
                             if current_session is not None:
@@ -1701,43 +1712,64 @@ class YuantaOrdWapper:
 
 class MyApp(wx.App):
     def MainLoop(self, run_func):
-
-        # Create an event loop and make it active.  If you are
-        # only going to temporarily have a nested event loop then
-        # you should get a reference to the old one and set it as
-        # the active event loop when you are done with this one...
+        """
+        改良版主事件迴圈 (完整保留原設計)
+        - 外層: 控制程式生命週期
+        - 中層: 處理交易工作佇列
+        - 內層: 處理 GUI 事件與 idle
+        - 新增: Frame 存活檢查 + idle 安全防護
+        """
         evtloop = wx.GUIEventLoop()
         old = wx.EventLoop.GetActive()
         wx.EventLoop.SetActive(evtloop)
 
-        # This outer loop determines when to exit the application,
-        # for this example we let the main frame reset this flag
-        # when it closes.
-        while self.keepGoing:
-            # At this point in the outer loop you could do
-            # whatever you implemented your own MainLoop for.  It
-            # should be quick and non-blocking, otherwise your GUI
-            # will freeze.
+        frame = wx.GetTopLevelWindows()[0] if wx.GetTopLevelWindows() else None
 
-            # call_your_code_here()
-            run_func()
-            while not q.empty():
-                next_job = q.get()
-                DoJob(Bot, next_job)
+        while getattr(self, "keepGoing", True):
+            # 1️⃣ 檢查 GUI 是否仍存在
+            if frame is None or not frame.IsShown():
+                print("⚠️ Frame 已關閉，結束 MainLoop。")
+                break
 
-            # This inner loop will process any GUI events
-            # until there are no more waiting.
-            while evtloop.Pending():
-                evtloop.Dispatch()
+            # 2️⃣ 主任務邏輯 (策略、行情更新)
+            try:
+                run_func()
+            except Exception as e:
+                print(f"MainLoop 執行 run_func 發生錯誤: {e}")
 
-            # Send idle events to idle handlers.  You may want to
-            # throttle this back a bit somehow so there is not too
-            # much CPU time spent in the idle handlers.  For this
-            # example, I'll just snooze a little...
-            time.sleep(0.10)
-            evtloop.ProcessIdle()
+            # 3️⃣ 核心佇列任務 (交易訊息)
+            try:
+                while not q.empty():
+                    next_job = q.get()
+                    DoJob(Bot, next_job)
+            except Exception as e:
+                print(f"DoJob 執行錯誤: {e}")
+
+            # 4️⃣ GUI 事件處理
+            try:
+                while evtloop.Pending():
+                    evtloop.Dispatch()
+            except Exception as e:
+                print(f"事件 Dispatch 錯誤: {e}")
+
+            # 5️⃣ Idle 與節流 (防止 CPU 滿載)
+            try:
+                time.sleep(0.10)
+                if wx.GetApp() and wx.GetApp().IsMainLoopRunning():
+                    evtloop.ProcessIdle()
+            except wx._core.wxAssertionError:
+                print("⚠️ wxAssertionError: 已關閉 GUI，停止事件循環。")
+                break
+            except RuntimeError:
+                print("⚠️ GUI 已被銷毀，跳出事件循環。")
+                break
+            except Exception as e:
+                print(f"Idle 處理錯誤: {e}")
+                break
 
         wx.EventLoop.SetActive(old)
+        print("✅ MainLoop 已正常結束。")
+
 
     def OnInit(self):
         self.keepGoing = True

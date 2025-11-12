@@ -12,7 +12,9 @@ from colorama import Fore, Style
 from .calculator import calc_profit_targets, parse_profit_triplet
 from .ui_updater import UIUpdater
 from .notifier import Notifier
-
+import threading
+import datetime
+import time
 
 class OrderManager:
     """
@@ -53,7 +55,7 @@ class OrderManager:
         回傳: "進場多" 或 "進場空"
         """
         p1, p2, p3 = calc_profit_targets(entry_price, stop_loss, direction)
-
+        levels = [s.strip() for s in fibonacci_str.split(":") if s.strip()]
         if direction == "多":
             row = 1
             color = wx.RED
@@ -61,7 +63,7 @@ class OrderManager:
             self.entry_price_buy = trigger_price
             self.stopLoss_buy = stop_loss
             self.profit_buy_str = f"{p1}:{p2}:{p3}"
-            label = "進場多"
+            label = f"進場多: {levels[3]}"
         else:
             row = 0
             color = wx.GREEN
@@ -69,23 +71,27 @@ class OrderManager:
             self.entry_price_sell = trigger_price
             self.stopLoss_sell = stop_loss
             self.profit_sell_str = f"{p1}:{p2}:{p3}"
-            label = "進場空"
+            label = f"進場空: {levels[3]}"
 
         # === UI 顯示更新 ===
         self.ui.update_signal_row(row, entry_price, stop_loss, p1, p2, p3, color)
 
         # === Fibonacci 價格設定 ===
         if fibonacci_str:
-            levels = [s.strip() for s in fibonacci_str.split(":") if s.strip()]
             if levels:
                 self.ui.set_price_combo_items(levels)
 
         # === 發出訊號通知 ===
         msg = (
             f"{match_time}  "
-            f"{'作多訊號' if direction == '多' else '放空訊號'}: {entry_price}  "
-            f"費波: {fibonacci_str} 止損: {stop_loss}  停利: {p1} : {p2} : {p3}"
+            f"{'作多訊號' if direction == '多' else '放空訊號'}: {levels[3]}  "
+            f"止損: {stop_loss}  停利: {p1}"
         )
+        # msg = (
+        #     f"{match_time}  "
+        #     f"{'作多訊號' if direction == '多' else '放空訊號'}: {entry_price}  "
+        #     f"費波: {fibonacci_str} 止損: {stop_loss}  停利: {p1} : {p2} : {p3}"
+        # )
         self.notifier.log(msg, Fore.CYAN + Style.BRIGHT)
         self.notifier.send_telegram_if_enabled(msg)
         self.notifier.play_sound_if_enabled()
@@ -318,3 +324,94 @@ class OrderManager:
                             
                 except Exception:
                     self.notifier.error("⚠️ 多單止損平倉下單失敗，請檢查 OnOrderBtn。")
+
+    # ========= 自動收盤平倉 =========
+    def start_auto_liquidation(self):
+        """
+        啟動自動收盤平倉監控（背景執行緒）。
+        每 30 秒檢查一次，若時間到且仍有庫存，就強制平倉。
+        """
+        t = threading.Thread(target=self._auto_liquidation_loop, daemon=True)
+        t.start()
+        self.notifier.log("✅ 自動收盤平倉監控已啟動", Fore.CYAN + Style.BRIGHT)
+
+    def _auto_liquidation_loop(self):
+        """每 30 秒檢查一次收盤時間，若有部位則強制平倉。"""
+        while True:
+            try:
+                now = datetime.datetime.now()
+                current = now.strftime("%H:%M")
+
+                # 台指期日盤 / 夜盤收盤時間
+                close_times = ["13:42", "04:57"]
+
+                if current in close_times:
+                    self._force_liquidation(now)
+
+                time.sleep(30)
+
+            except Exception as e:
+                print(f"自動平倉監控錯誤: {e}")
+                time.sleep(30)
+
+    def _force_liquidation(self, now):
+        """在收盤時間強制平倉。"""
+        match_time = now.strftime("%H:%M:%S")
+
+        # 若仍有空單
+        if getattr(self, "trading_sell", False):
+            msg = f"{match_time} ⚠️ 收盤自動平倉觸發：空單強制平倉"
+            self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
+            self._execute_force_exit("空", now)
+
+        # 若仍有多單
+        if getattr(self, "trading_buy", False):
+            msg = f"{match_time} ⚠️ 收盤自動平倉觸發：多單強制平倉"
+            self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
+            self._execute_force_exit("多", now)
+
+    def _execute_force_exit(self, direction: str, now: datetime.datetime):
+        """
+        執行實際平倉委託。
+        與停損/停利邏輯完全一致，只是由時間觸發。
+        """
+        try:
+            # 空單要買回；多單要賣出
+            side = "B" if direction == "空" else "S"
+            offset = "1"
+            price = int(self.frame.infoDataGrid.GetCellValue(0, 0)) if direction == "空" else int(self.frame.infoDataGrid.GetCellValue(0, 1))  # 市價
+
+            msg = f"{now.strftime('%H:%M:%S')} ⏰ 自動平倉觸發：{direction}單 → {price}平倉"
+            self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
+
+            if self.frame.acclist_combo.GetCount() != 0:
+                if ((direction == "多" and self.frame.chkBuy.IsChecked()) or
+                    (direction == "空" and self.frame.chkSell.IsChecked())):
+                    val = self.frame.qtyLabel.GetLabel()
+                    qty = int(val) if val.isdigit() else 0
+                    if qty > 0:    
+                        # 呼叫原生下單介面
+                        self.frame.OnOrderBtn(
+                            event=None,
+                            S_Buys=side,
+                            price=price,
+                            offset=offset
+                        )
+                        self.frame.qtyLabel.SetLabel("未連") 
+
+                    msg_done = f"{now.strftime('%H:%M:%S')} ✅ 自動平倉成功：{direction}單"
+                    self.notifier.log(msg_done, Fore.GREEN + Style.BRIGHT)
+                    self.notifier.send_telegram_if_enabled(msg_done)
+
+                    # 更新持倉狀態
+                    if direction == "多":
+                        self.trading_buy = False
+                        self.buy_signal = False
+                        self.profit_buy_str = ""
+                    else:
+                        self.trading_sell = False
+                        self.sell_signal = False
+                        self.profit_sell_str = ""
+
+        except Exception as e:
+            self.notifier.error(f"⚠️ 自動收盤平倉失敗: {e}")

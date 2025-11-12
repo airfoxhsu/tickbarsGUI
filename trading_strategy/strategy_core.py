@@ -42,11 +42,6 @@ class TradingStrategy:
         self.ui = UIUpdater(self.frame)
         self.order = OrderManager(self.frame, self.ui, self.notifier)
 
-        self.notifier.log(
-            "✅ TradingStrategy 初始化完成",
-            Fore.GREEN + Style.BRIGHT
-        )
-
         # ===== 狀態變數 =====
 
         # 商品資料庫（累積量與時間）
@@ -112,6 +107,14 @@ class TradingStrategy:
         # 代表「當前多單/空單採用的那組 fibonacci 價格」
         self.fibonacci_chkBuy_str: str = "0"
         self.fibonacci_chkSell_str: str = "0"
+
+        # 啟動自動收盤平倉監控（背景執行緒）。
+        self.order.start_auto_liquidation()
+        
+        self.notifier.log(
+            "✅ TradingStrategy 初始化完成",
+            Fore.GREEN + Style.BRIGHT
+        )
 
     # ===== 舊版相容屬性 =====
     @property
@@ -564,8 +567,8 @@ class TradingStrategy:
             self.trending_up = False
             self.trending_down = True
             color_main = Fore.GREEN
-            if temp in ["進場多", "進場空"]:
-                trend_color = Fore.GREEN if temp == "進場空" else Fore.RED
+            if any(c in temp for c in ["進場多", "進場空"]):
+                trend_color = Fore.GREEN if any(c in temp for c in "空") else Fore.RED
             else:
                 trend_color = Fore.GREEN
                 mark_temp_close_price_color = "Fore.GREEN + Style.BRIGHT"
@@ -582,8 +585,8 @@ class TradingStrategy:
             self.trending_up = True
             self.trending_down = False
             color_main = Fore.RED
-            if temp in ["進場多", "進場空"]:
-                trend_color = Fore.RED if temp == "進場多" else Fore.GREEN
+            if any(c in temp for c in ["進場多", "進場空"]):
+                trend_color = Fore.RED if any(c in temp for c in "多") else Fore.GREEN
             else:
                 trend_color = Fore.RED
                 mark_temp_close_price_color = "Fore.RED + Style.BRIGHT"
