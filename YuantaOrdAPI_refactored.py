@@ -31,13 +31,20 @@ class AppFrame(wx.Frame):
 
     def __init__(self, *args, **kw):
         # Integrated TradingStrategy initialization
-        self.TELEGRAM_TOKEN = "8341950229:AAHw3h_p0Bnf_KcS5Mr4x3cOpIKHeFACiBs"
-        self.TELEGRAM_CHAT_ID = "8485648973"
+        # self.TELEGRAM_TOKEN = "8341950229:AAHw3h_p0Bnf_KcS5Mr4x3cOpIKHeFACiBs"
+        # self.TELEGRAM_CHAT_ID = "8485648973"
 
         # ensure the parent's __init__ is called
         super(AppFrame, self).__init__(*args, **kw)
         # create a panel in the frame
         pnl = wx.Panel(self)
+
+        config = load_json("./config.json")
+        self.Username = config["username"]
+        self.Password = config["password"]
+        self.Host = "203.66.93.84"
+        self.Port = 443 
+
         self.waitMinuteToSMS = True   # 等待分鐘數重置簡訊發送
         self.last_userdefine_source = None  # 紀錄最後一次通用查詢的來源
 
@@ -46,10 +53,10 @@ class AppFrame(wx.Frame):
         wx.StaticBox(pnl, label='API連線資訊', pos=(1, 1), size=(650, 70))
         wx.StaticText(pnl, label='ID', pos=(11, 30))
         wx.StaticText(pnl, label='密碼', pos=(155, 30))
-        config = load_json("./config.json")
+        # config = load_json("./config.json")
         self.acc = wx.TextCtrl(
-            pnl, value=config["username"], pos=(42, 26), size=(100, 25))
-        self.pwd = wx.TextCtrl(pnl, value=config["password"], pos=(
+            pnl, value=self.Username, pos=(42, 26), size=(100, 25))
+        self.pwd = wx.TextCtrl(pnl, value=self.Password, pos=(
             186, 26), size=(100, 25), style=wx.TE_PASSWORD)
 
         wx.StaticText(pnl, label='狀態碼', pos=(300, 30))
@@ -145,14 +152,16 @@ class AppFrame(wx.Frame):
 
         order = wx.Button(pnl, wx.ID_ANY, label='下單',
                           pos=(578, 126), size=(50, 25))
-        val = self.price_combo.GetString(self.price_combo.GetSelection())
-        price = int(val) if val.isdigit() else 0
-        S_Buys = self.bscode1_combo.GetString(
-            self.bscode1_combo.GetSelection())[0:1]
-        offset = self.offset_combo.GetString(
-            self.offset_combo.GetSelection())[0:1],
+        # val = self.price_combo.GetString(self.price_combo.GetSelection())
+        # # price = int(val) if val.isdigit() and val != "0" else "0"
+        # price= val
+        # S_Buys = self.bscode1_combo.GetString(
+        #     self.bscode1_combo.GetSelection())[0:1]
+        # offset = self.offset_combo.GetString(
+        #     self.offset_combo.GetSelection())[0:1]
+        # # offset= "1"
         order.Bind(wx.EVT_BUTTON, partial(
-            self.OnOrderBtn, S_Buys=S_Buys, price=price, offset=offset))
+            self.OnOrderBtn, S_Buys=None, price=None, offset=None))
 
         logon = wx.Button(pnl, wx.ID_ANY, label='登入',
                           pos=(518, 156), size=(50, 25))
@@ -818,6 +827,14 @@ class AppFrame(wx.Frame):
             # wx.MessageBox('請先登入並選擇期貨帳號','錯誤',wx.OK | wx.ICON_ERROR)
             self.Logmessage('請先登入並選擇期貨帳號')
             return
+        if event:
+            val = self.price_combo.GetString(self.price_combo.GetSelection())
+            # price = int(val) if val.isdigit() and val != "0" else "0"
+            price= val
+            S_Buys = self.bscode1_combo.GetString(
+                self.bscode1_combo.GetSelection())[0:1]
+            offset = self.offset_combo.GetString(
+                self.offset_combo.GetSelection())[0:1]
         vars = self.acclist_combo.GetString(
             self.acclist_combo.GetSelection()).split('-')
         bhno = vars[1]
@@ -911,13 +928,13 @@ class AppFrame(wx.Frame):
                 self.Logmessage(msg)
                 ts.__init__(frame)
                 self.ConnectionQuote(None)
-            time.sleep(10)
+            time.sleep(60)
 
     def ConnectionQuote(self, event=None):
-        config = load_json("./config.json")
-        self.Username = config["username"]
-        self.Password = config["password"]
-        self.Host = "203.66.93.84"
+        # config = load_json("./config.json")
+        # self.Username = config["username"]
+        # self.Password = config["password"]
+        # self.Host = "203.66.93.84"
         self.Port = 443 if self.is_day() else 442
         LogonQuoteJob(Job.LOGONQUOTE, self.Username,
                       self.Password, self.Host, self.Port)
@@ -1752,9 +1769,9 @@ class MyApp(wx.App):
             except Exception as e:
                 print(f"事件 Dispatch 錯誤: {e}")
 
-            # 5️⃣ Idle 與節流 (防止 CPU 滿載)
+            # 5️⃣ Idle 與節流 time.sleep(防止 CPU 滿載)
             try:
-                time.sleep(0.10)
+                # time.sleep(0.1)
                 if wx.GetApp() and wx.GetApp().IsMainLoopRunning():
                     evtloop.ProcessIdle()
             except wx._core.wxAssertionError:
