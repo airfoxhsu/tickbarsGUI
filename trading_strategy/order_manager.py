@@ -626,15 +626,15 @@ class OrderManager:
                     self.notifier.log(msg_done, Fore.GREEN + Style.BRIGHT)
                     self.notifier.send_telegram_if_enabled(msg_done)
 
-                    # 更新持倉狀態
-                    if direction == "多":
-                        self.trading_buy = False
-                        self.buy_signal = False
-                        self.profit_buy_str = ""
-                    else:
-                        self.trading_sell = False
-                        self.sell_signal = False
-                        self.profit_sell_str = ""
+            # 更新持倉狀態
+            if direction == "多":
+                self.trading_buy = False
+                self.buy_signal = False
+                self.profit_buy_str = ""
+            else:
+                self.trading_sell = False
+                self.sell_signal = False
+                self.profit_sell_str = ""
 
         except Exception as e:  # noqa: BLE001
             self.notifier.error(f"⚠️ 自動收盤平倉失敗: {e}")

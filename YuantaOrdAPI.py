@@ -191,7 +191,10 @@ class AppFrame(wx.Frame):
         self.OrdQueryRpt = wx.ListBox(pnl, pos=(10, 450), size=(
             530, 90), style=wx.LB_SINGLE | wx.LB_HSCROLL)
         self.OrdQueryRpt.Bind(wx.EVT_KEY_DOWN, self.OnCtrlC)
-
+        # self.OrdQueryRpt.Append(
+        #     "TEST >>> " + "太長太長太長太長太長太長太長太長太長太長太長太長太長太長太長太長" * 3
+        # )
+        # self.OrdQueryRpt.SetBackgroundColour("blue")
         ###################################################################################
 
         ############################################################################
