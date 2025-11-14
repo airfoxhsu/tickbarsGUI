@@ -417,7 +417,7 @@ class OrderManager:
             p1, p2, p3 = parse_profit_triplet(self.profit_sell_str)
             if p1 and p2 and p3 and self.entry_price_sell:
                 if self.frame.chkProfit.IsChecked():
-                    p = int(self.ktprice_combo.GetValue() or 0)
+                    p = int(self.frame.ktprice_combo.GetValue() or 0)
                     if price <= p:
                         self._exit_takeprofit_all("空", price, match_time,str(p))
                     # elif price <= p2:
@@ -446,7 +446,7 @@ class OrderManager:
             p1, p2, p3 = parse_profit_triplet(self.profit_buy_str)
             if p1 and p2 and p3 and self.entry_price_buy:
                 if self.frame.chkProfit.IsChecked():
-                    p = int(self.ktprice_combo.GetValue() or 0)
+                    p = int(self.frame.ktprice_combo.GetValue() or 0)
                     if price >= p:
                         # BUG 修正：原本少傳 match_time，會造成 TypeError
                         self._exit_takeprofit_all("多", price, match_time,str(p))
