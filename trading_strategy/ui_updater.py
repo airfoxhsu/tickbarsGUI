@@ -226,7 +226,7 @@ class UIUpdater:
         g.SetCellValue(1, 4, str(int(temp_avg_price)))
         g.SetCellValue(1, 6, str(group_size))
 
-    def set_price_combo_items(self, items: List[int]) -> None:
+    def set_price_combo_items(self, items: List[int] ,profits= List[int]) -> None:
         """
         將價格選單 (price_combo) 設定為指定價位列表。
 
@@ -243,6 +243,12 @@ class UIUpdater:
             # 預設選第 4 個價位（若不足 4 個，就選最後一個）
             combo.SetSelection(min(3, len(items) - 1))
 
+        combo = self.frame.ktprice_combo
+        combo.SetItems([str(i) for i in profits])
+        if profits:
+            # 預設選第 3 個價位（若不足 3 個，就選最後一個）
+            combo.SetSelection(min(2, len(profits) - 1))
+
     def reset_price_select_state(self) -> None:
         """
         重置價格選單與相關 CheckBox 狀態。
@@ -252,6 +258,9 @@ class UIUpdater:
         """
         self.frame.price_combo.SetItems(["0"])
         self.frame.price_combo.SetSelection(0)
+
+        self.frame.ktprice_combo.SetItems(["0"])
+        self.frame.ktprice_combo.SetSelection(0)
 
         # 關閉「錯失訊號」勾選
         if hasattr(self.frame, "chkSignal"):

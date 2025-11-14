@@ -115,7 +115,7 @@ class OrderManager:
         """
         # 計算三段停利價位（profit_1, profit_2, profit_3）
         p1, p2, p3 = calc_profit_targets(entry_price, stop_loss, direction)
-
+        profits = [p1,p2,p3]
         # 將 Fibonacci 價格字串拆成清單，並去除空白與空字串
         levels = [s.strip() for s in fibonacci_str.split(":") if s.strip()]
 
@@ -130,6 +130,8 @@ class OrderManager:
             self.profit_buy_str = f"{p1}:{p2}:{p3}"
             # 使用第 4 段 Fibonacci 作為「主訊號價」顯示（呼叫者既有邏輯）
             label = f"進場多: {levels[3] if len(levels) > 3 else entry_price}"
+            if self.frame.chkBuy.IsChecked() and fibonacci_str and levels:
+                self.ui.set_price_combo_items(levels,profits)
         else:
             row = 0                   # GUI 訊號列的「空單」所在列索引
             color = wx.GREEN          # 空單訊號顯示為綠色
@@ -138,6 +140,9 @@ class OrderManager:
             self.stopLoss_sell = stop_loss
             self.profit_sell_str = f"{p1}:{p2}:{p3}"
             label = f"進場空: {levels[3] if len(levels) > 3 else entry_price}"
+            if self.frame.chkSell.IsChecked() and fibonacci_str and levels:
+                self.ui.set_price_combo_items(levels,profits)
+
 
         # === UI 顯示更新 ===
         # 在 GUI 訊號列中顯示：進場價 / 止損 / 三段停利價位
@@ -145,8 +150,8 @@ class OrderManager:
 
         # === Fibonacci 價格設定 ===
         # 若有提供 Fibonacci 價格，更新 GUI 上的價格選單。
-        if fibonacci_str and levels:
-            self.ui.set_price_combo_items(levels)
+        # if fibonacci_str and levels:
+        #     self.ui.set_price_combo_items(levels)
 
         # === 發出訊號通知 ===
         # 簡短版訊息（給 Telegram）
@@ -323,6 +328,7 @@ class OrderManager:
         direction: str,
         price: int,
         match_time: str,
+        profit_str: str,
     ) -> None:
         """
         第三段停利價達成時，全部平倉了結。
@@ -337,7 +343,7 @@ class OrderManager:
             停利觸發時間，用於 log。
         """
         tag = "多單" if direction == "多" else "空單"
-        msg = f"{match_time} 🏁 {tag}觸及 profit_3 → 平倉 {int(price)}"
+        msg = f"{match_time} 🏁 {tag}觸及 {profit_str} → 平倉 {int(price)}"
         self.notifier.log(msg, Fore.MAGENTA + Style.BRIGHT)
 
         side = "S" if direction == "多" else "B"
@@ -410,40 +416,62 @@ class OrderManager:
         if self.trading_sell and self.profit_sell_str:
             p1, p2, p3 = parse_profit_triplet(self.profit_sell_str)
             if p1 and p2 and p3 and self.entry_price_sell:
-                if price <= p1 and self.stopLoss_sell > self.entry_price_sell:
-                    self.stopLoss_sell = self.entry_price_sell
-                    self.notifier.log(
-                        f"{match_time} 🟢 空單觸及 profit_1 → 停損改至進場價 {self.stopLoss_sell}",
-                        Fore.CYAN + Style.BRIGHT,
-                    )
-                elif price <= p2 and self.stopLoss_sell > p1:
-                    self.stopLoss_sell = p1
-                    self.notifier.log(
-                        f"{match_time} 🟢 空單觸及 profit_2 → 停損改至 {self.stopLoss_sell}",
-                        Fore.CYAN + Style.BRIGHT,
-                    )
-                elif price <= p3:
-                    self._exit_takeprofit_all("空", price, match_time)
+                if self.frame.chkProfit.IsChecked():
+                    p = int(self.ktprice_combo.GetValue() or 0)
+                    if price <= p:
+                        self._exit_takeprofit_all("空", price, match_time,str(p))
+                    # elif price <= p2:
+                    #     self._exit_takeprofit_all("空", price, match_time,"profit_2")
+                    # elif price <= p3:
+                    #     self._exit_takeprofit_all("空", price, match_time,"profit_3")
+
+                else:
+                    if price <= p1 and self.stopLoss_sell > self.entry_price_sell:
+                        self.stopLoss_sell = self.entry_price_sell
+                        self.notifier.log(
+                            f"{match_time} 🟢 空單觸及 profit_1 → 停損改至進場價 {self.stopLoss_sell}",
+                            Fore.CYAN + Style.BRIGHT,
+                        )
+                    elif price <= p2 and self.stopLoss_sell > p1:
+                        self.stopLoss_sell = p1
+                        self.notifier.log(
+                            f"{match_time} 🟢 空單觸及 profit_2 → 停損改至 {self.stopLoss_sell}",
+                            Fore.CYAN + Style.BRIGHT,
+                        )
+                    elif price <= p3:
+                        self._exit_takeprofit_all("空", price, match_time,"profit_3")
 
         # === 多單移動停損 ===
         if self.trading_buy and self.profit_buy_str:
             p1, p2, p3 = parse_profit_triplet(self.profit_buy_str)
             if p1 and p2 and p3 and self.entry_price_buy:
-                if price >= p1 and self.stopLoss_buy < self.entry_price_buy:
-                    self.stopLoss_buy = self.entry_price_buy
-                    self.notifier.log(
-                        f"{match_time} 🟢 多單觸及 profit_1 → 停損改至進場價 {self.stopLoss_buy}",
-                        Fore.CYAN + Style.BRIGHT,
-                    )
-                elif price >= p2 and self.stopLoss_buy < p1:
-                    self.stopLoss_buy = p1
-                    self.notifier.log(
-                        f"{match_time} 🟢 多單觸及 profit_2 → 停損改至 {self.stopLoss_buy}",
-                        Fore.CYAN + Style.BRIGHT,
-                    )
-                elif price >= p3:
-                    # BUG 修正：原本少傳 match_time，會造成 TypeError
-                    self._exit_takeprofit_all("多", price, match_time)
+                if self.frame.chkProfit.IsChecked():
+                    p = int(self.ktprice_combo.GetValue() or 0)
+                    if price >= p:
+                        # BUG 修正：原本少傳 match_time，會造成 TypeError
+                        self._exit_takeprofit_all("多", price, match_time,str(p))
+                    # elif price >= p2:
+                    #     # BUG 修正：原本少傳 match_time，會造成 TypeError
+                    #     self._exit_takeprofit_all("多", price, match_time,"profit_2")
+                    # elif price >= p3:
+                    #     # BUG 修正：原本少傳 match_time，會造成 TypeError
+                    #     self._exit_takeprofit_all("多", price, match_time,"profit_3")
+                else:
+                    if price >= p1 and self.stopLoss_buy < self.entry_price_buy:
+                        self.stopLoss_buy = self.entry_price_buy
+                        self.notifier.log(
+                            f"{match_time} 🟢 多單觸及 profit_1 → 停損改至進場價 {self.stopLoss_buy}",
+                            Fore.CYAN + Style.BRIGHT,
+                        )
+                    elif price >= p2 and self.stopLoss_buy < p1:
+                        self.stopLoss_buy = p1
+                        self.notifier.log(
+                            f"{match_time} 🟢 多單觸及 profit_2 → 停損改至 {self.stopLoss_buy}",
+                            Fore.CYAN + Style.BRIGHT,
+                        )
+                    elif price >= p3:
+                        # BUG 修正：原本少傳 match_time，會造成 TypeError
+                        self._exit_takeprofit_all("多", price, match_time,"profit_3")
 
     def check_stoploss_triggered(self, price: int, match_time: str) -> None:
         """

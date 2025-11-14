@@ -2,7 +2,7 @@ import os
 import time
 from datetime import datetime, timedelta
 
-def cleanup_yuanta_logs(folder: str = ".", keep_days: int = 3):
+def cleanup_yuanta_logs(folder: str = ".", keep_days: int = 1):
     """
     清理 Yuanta API 自動產生的 log 檔案。
     預設只保留 keep_days 天內的檔案。

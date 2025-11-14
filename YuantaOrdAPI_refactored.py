@@ -108,32 +108,49 @@ class AppFrame(wx.Frame):
         self.futno1_combo.SetSelection(1)
 
         wx.StaticText(pnl, label='價格', pos=(271, 130))
-        self.price_combo = wx.Choice(
-            pnl, choices=['0'], pos=(310, 127), size=(70, 23))
+        self.price_combo = wx.ComboBox(
+            pnl, choices=['0'], pos=(310, 127), size=(70, 23),
+            style=wx.CB_DROPDOWN | wx.TE_PROCESS_ENTER
+        )        
         self.price_combo.SetSelection(0)
+        # 限制鍵盤輸入（只能按數字、Backspace、方向鍵）
+        self.price_combo.Bind(wx.EVT_CHAR, self.OnComboNumberOnly)
+        # Enter 觸發驗證（最多五位，轉成有效數字）
+        self.price_combo.Bind(wx.EVT_TEXT_ENTER, self.OnComboEnterValidate)
+
 
         wx.StaticText(pnl, label='數量', pos=(391, 130))
         self.lots_combo = wx.Choice(
             pnl, choices=['1', '2', '3', '4', '5'], pos=(430, 127), size=(50, 23))
         self.lots_combo.SetSelection(0)
 
-        self.ktcheck = wx.CheckBox(pnl, label='停利', pos=(520, 130))
-        self.ktcheck.Bind(wx.EVT_CHECKBOX, self.OnktcheckBtn)
+        self.chkProfit = wx.CheckBox(pnl, label='停利', pos=(520, 130))
+        self.chkProfit.Bind(wx.EVT_CHECKBOX, self.OnChkProfit)
 
         self.textbs2 = wx.StaticText(pnl, label='停利', pos=(11, 160))
         self.bscode2_combo = wx.Choice(
             pnl, choices=['B-買進', 'S-賣出'], pos=(50, 157), size=(70, 30))
         self.bscode2_combo.SetSelection(0)
-        self.textbs2.Show(False)
-        self.bscode2_combo.Show(False)
+        # self.textbs2.Show(False)
+        # self.bscode2_combo.Show(False)
 
         # self.textsymbol = wx.StaticText(pnl, label='商品2', pos=(141, 160))
         # self.futno2 = wx.TextCtrl(pnl, pos=(180, 157), size=(70, 23))
 
         self.textktprice = wx.StaticText(pnl, label='停利價', pos=(141, 160))
-        self.ktprice = wx.TextCtrl(pnl, pos=(180, 157), size=(70, 23))
-        self.textktprice.Show(False)
-        self.ktprice.Show(False)
+        self.ktprice_combo = wx.ComboBox(
+            pnl,
+            choices=['0'],
+            pos=(180, 157),   # ❗座標你自己調整
+            size=(70, 23),
+            style=wx.CB_DROPDOWN | wx.TE_PROCESS_ENTER
+        )
+        self.ktprice_combo.SetSelection(0)
+        # 綁定輸入限制 & Enter 驗證
+        self.ktprice_combo.Bind(wx.EVT_CHAR, self.OnComboNumberOnly)
+        self.ktprice_combo.Bind(wx.EVT_TEXT_ENTER, self.OnComboEnterValidate)
+        # self.textktprice.Show(False)
+        # self.ktprice_combo.Show(False)
 
         wx.StaticText(pnl, label='限市價', pos=(271, 160))
         self.pritype_combo = wx.Choice(
@@ -151,15 +168,7 @@ class AppFrame(wx.Frame):
         self.pritype_cond.SetSelection(0)
 
         order = wx.Button(pnl, wx.ID_ANY, label='下單',
-                          pos=(578, 126), size=(50, 25))
-        # val = self.price_combo.GetString(self.price_combo.GetSelection())
-        # # price = int(val) if val.isdigit() and val != "0" else "0"
-        # price= val
-        # S_Buys = self.bscode1_combo.GetString(
-        #     self.bscode1_combo.GetSelection())[0:1]
-        # offset = self.offset_combo.GetString(
-        #     self.offset_combo.GetSelection())[0:1]
-        # # offset= "1"
+                          pos=(578, 126), size=(50, 25))       
         order.Bind(wx.EVT_BUTTON, partial(
             self.OnOrderBtn, S_Buys=None, price=None, offset=None))
 
@@ -200,10 +209,7 @@ class AppFrame(wx.Frame):
         self.OrdQueryRpt = wx.ListBox(pnl, pos=(10, 450), size=(
             530, 90), style=wx.LB_SINGLE | wx.LB_HSCROLL)
         self.OrdQueryRpt.Bind(wx.EVT_KEY_DOWN, self.OnCtrlC)
-#         self.OrdQueryRpt.Append(
-#     "TEST >>> " + "太長太長太長太長太長太長太長太長太長太長太長太長太長太長太長太長" * 3
-# )
-#         self.OrdQueryRpt.SetBackgroundColour("blue")
+
         ###################################################################################
 
         ############################################################################
@@ -493,11 +499,14 @@ class AppFrame(wx.Frame):
         self.compareInfoGrid.SetCellValue(1, 4, "猶豫不決")
         self.compareInfoGrid.SetCellValue(1, 5, "學會果斷")
         self.compareInfoGrid.SetCellValue(1, 6, "老無成")
-        # self.compareInfoGrid.EnableScrolling(False, False)
 
         self.compareInfoGrid.SetDefaultCellBackgroundColour('BLACK')
-        self.compareInfoGrid.EnableEditing(False)
         self.compareInfoGrid.AutoSizeColumns()
+        self.compareInfoGrid.EnableEditing(True)    #   整張表格可編輯
+        for r in range(self.compareInfoGrid.GetNumberRows()):    #   再把其他表格鎖起來
+            for c in range(self.compareInfoGrid.GetNumberCols()):
+                self.compareInfoGrid.SetReadOnly(r, c, True)
+        self.compareInfoGrid.SetReadOnly(0, 6, False)     #    最後開放你要輸入的這一格
 
         attr_yellow = wx.grid.GridCellAttr()
         attr_yellow.SetTextColour(wx.YELLOW)
@@ -569,6 +578,60 @@ class AppFrame(wx.Frame):
 
         # 所有 UI 初始化完成後加這行
         self.Bind(wx.EVT_CLOSE, self.OnClose)
+
+    def OnComboNumberOnly(self, event):
+        key = event.GetKeyCode()
+
+        # 允許 Backspace
+        if key == wx.WXK_BACK:
+            event.Skip(); return
+
+        # 允許 Enter
+        if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
+            event.Skip(); return
+
+        # 允許方向鍵
+        if key in (wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_UP, wx.WXK_DOWN):
+            event.Skip(); return
+
+        # 允許 0–9（主鍵盤 + 小鍵盤）
+        if (48 <= key <= 57) or (wx.WXK_NUMPAD0 <= key <= wx.WXK_NUMPAD9):
+            event.Skip(); return
+
+        # ❌ 阻擋其他按鍵
+        return
+
+
+    def OnComboEnterValidate(self, event):
+        combo = event.GetEventObject()   # ⭐ 自動抓到 price_combo 或 ktprice_combo
+        # 🔥 判斷是哪一個 ComboBox
+        if combo is self.price_combo:
+            combo_name = "進場"
+        elif combo is self.ktprice_combo:
+            combo_name = "停利"
+        else:
+            combo_name = "未知 ComboBox"
+
+        val = combo.GetValue()
+        # 只保留數字
+        filtered = ''.join([ch for ch in val if ch.isdigit()])
+
+        # ❌ 錯誤：不是 5 位數
+        if len(filtered) != 5:
+            wx.Bell()  # 發出錯誤提示聲
+
+            self.Logmessage(f"{combo_name}價格必須是 5 位數！")
+            combo.SetValue("0")
+            combo.SetSelection(-1, -1)  # 全選
+            return  # ❗ 不 Skip → 不會產生系統 beep
+
+        # ✔ 正確 → 生效
+        combo.SetValue(str(filtered))
+        self.Logmessage(f"{combo_name}價格生效：{filtered}")
+
+        return  # 不 Skip → 不會 beep
+
+
 
     def OnClose(self, event):
         app = wx.GetApp()
@@ -769,6 +832,8 @@ class AppFrame(wx.Frame):
                 new_choices = ["0"]  # 或給預設選單
                 self.price_combo.SetItems(new_choices)
                 self.price_combo.SetSelection(0)
+            if self.chkProfit.IsChecked():
+                self.OnChkProfit(None)    
         elif cb == self.chkBuy and self.chkBuy.IsChecked():
             self.chkSell.SetValue(False)
             self.bscode1_combo.SetSelection(0)  # B-買進
@@ -782,10 +847,17 @@ class AppFrame(wx.Frame):
                 new_choices = ["0"]  # 或給預設選單
                 self.price_combo.SetItems(new_choices)
                 self.price_combo.SetSelection(0)
+            if self.chkProfit.IsChecked():
+                self.OnChkProfit(None)    
         else:
             new_choices = ["0"]  # 或給預設選單
             self.price_combo.SetItems(new_choices)
             self.price_combo.SetSelection(0)
+            if self.chkProfit.IsChecked():
+                self.chkProfit.SetValue(False) 
+                new_choices = ["0"]  # 或給預設選單
+                self.ktprice_combo.SetItems(new_choices)
+                self.ktprice_combo.SetSelection(0)   
 
     def OnLogonBtn(self, event):
         LogonJob(Job.LOGON, self.acc.GetValue(), self.pwd.GetValue())
@@ -799,6 +871,7 @@ class AppFrame(wx.Frame):
         self.missedSignal_combo.SetSelection(0)
         self.chkSell.SetValue(False)
         self.chkBuy.SetValue(False)
+        self.chkProfit.SetValue(False)
         LogoutJob(Job.LOGOUT)
 
     def OnUserDefineBtn(self, event=None, method=None):
@@ -831,9 +904,9 @@ class AppFrame(wx.Frame):
             self.Logmessage('請先登入並選擇期貨帳號')
             return
         if event:
-            val = self.price_combo.GetString(self.price_combo.GetSelection())
+            # val = self.price_combo.GetString(self.price_combo.GetSelection())
+            price = self.price_combo.GetValue()
             # price = int(val) if val.isdigit() and val != "0" else "0"
-            price= val
             S_Buys = self.bscode1_combo.GetString(
                 self.bscode1_combo.GetSelection())[0:1]
             offset = self.offset_combo.GetString(
@@ -869,31 +942,67 @@ class AppFrame(wx.Frame):
         ae_no = vars[3]
         MatQueryJob(Job.MATQUERY, bhno, account, ae_no)
 
-    def OnktcheckBtn(self, event):
-        if self.ktcheck.GetValue() == True:
-            # self.pritype_rfcombo.Show(True)  # 待刪
-            # self.pritype_combo.Show(True)
-            # self.ctype_rfcombo.Show(True)    # 待刪
-            # self.ctype_combo.Show(True)
-            # self.offset_combo.SetSelection(3)
-            # self.pritype_cond.SetSelection(0)
-            self.textktprice.Show(True)
-            self.ktprice.Show(True)
-            # self.textsymbol.Show(False)   # 待刪
-            # self.futno2.Show(False)       # 待刪
-            self.textbs2.Show(True)
-            self.bscode2_combo.Show(True)
+    def OnChkProfit(self, event):
+        if self.chkProfit.GetValue() == True and self.chkSell.IsChecked():
+            # self.textktprice.Show(True)
+            # self.ktprice_combo.Show(True)
+            # self.textbs2.Show(True)
+            # self.bscode2_combo.Show(True)
+            self.chkBuy.SetValue(False)
+            self.bscode1_combo.SetSelection(1)  # S-賣出
+            self.bscode2_combo.SetSelection(0)  # B-買進
+            # 空單停利目標三段價位字串
+            if ts.order.profit_sell_str and ts.order.profit_sell_str.strip() != "0":
+                new_choices = [s.strip()
+                            for s in ts.order.profit_sell_str.split(":")]
+                self.ktprice_combo.SetItems(new_choices)
+                self.ktprice_combo.SetSelection(2)
+            else:
+                new_choices = ["0"]  # 或給預設選單
+                self.ktprice_combo.SetItems(new_choices)
+                self.ktprice_combo.SetSelection(0)
+        elif self.chkProfit.GetValue() == True and self.chkBuy.IsChecked():
+            # self.textktprice.Show(True)
+            # self.ktprice_combo.Show(True)
+            # self.textbs2.Show(True)
+            # self.bscode2_combo.Show(True)
+            self.chkSell.SetValue(False)
+            self.bscode1_combo.SetSelection(0)  # B-買進
+            self.bscode2_combo.SetSelection(1)  # S-賣出
+            # 多單停利目標三段價位字串
+            if ts.order.profit_buy_str and ts.order.profit_buy_str.strip() != "0":
+                new_choices = [s.strip()
+                            for s in ts.order.profit_buy_str.split(":")]
+                self.ktprice_combo.SetItems(new_choices)
+                self.ktprice_combo.SetSelection(2)
+            else:
+                new_choices = ["0"]  # 或給預設選單
+                self.ktprice_combo.SetItems(new_choices)
+                self.ktprice_combo.SetSelection(0)
+        # else:
+        #     new_choices = ["0"]  # 或給預設選單
+        #     self.ktprice_combo.SetItems(new_choices)
+        #     self.ktprice_combo.SetSelection(0)  
+        elif self.chkProfit.IsChecked():
+            self.chkProfit.SetValue(False)
+            new_choices = ["0"]  # 或給預設選單
+            self.ktprice_combo.SetItems(new_choices)
+            self.ktprice_combo.SetSelection(0)  
+            # self.textktprice.Show(False)
+            # self.ktprice_combo.Show(False)
+            # self.textbs2.Show(False)
+            # self.bscode2_combo.Show(False)
+            self.Logmessage("未勾選作空或作多")
         else:
-            # self.pritype_rfcombo.Show(False)
-            # self.pritype_combo.Show(False)
-            # self.ctype_rfcombo.Show(False)
-            # self.ctype_combo.Show(False)
-            self.textktprice.Show(False)
-            self.ktprice.Show(False)
-            # self.textsymbol.Show(True)
-            # self.futno2.Show(True)
-            self.textbs2.Show(False)
-            self.bscode2_combo.Show(False)
+            self.chkProfit.SetValue(False)
+            new_choices = ["0"]  # 或給預設選單
+            self.ktprice_combo.SetItems(new_choices)
+            self.ktprice_combo.SetSelection(0)  
+            # self.textktprice.Show(False)
+            # self.ktprice_combo.Show(False)
+            # self.textbs2.Show(False)
+            # self.bscode2_combo.Show(False)
+            # self.Logmessage("未勾選作空或作多")    
 
     def Logmessage(self, msg):
         # 如果是 Exception，就轉成字串
@@ -1300,8 +1409,8 @@ class OrderJob(Job):
         self.account = account
         self.ae_no = ae_no
         self.S_Buys = S_Buys
-        self.price = price
-        self.offset = offset
+        self.price = str(price)
+        self.offset = str(offset)
         q.put(self)
 
 
@@ -1389,7 +1498,7 @@ class StockBot:
             self.Yuanta.YuantaOrd.SetWaitOrdResult(0)
 
         ## 停利##
-        # if frame.ktcheck.GetValue() == True:
+        # if frame.chkProfit.GetValue() == True:
         #     frame.Logmessage("RfSendOrder() {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
         #         frame.fcode_combo.GetString(
         #             frame.fcode_combo.GetSelection())[0:2],
@@ -1505,7 +1614,7 @@ class StockBot:
         frame.Logmessage("SendOrderF() return = {}".format(ret_no))
 
     def send_ordQuery(self, bhon, account, ae_no):
-        # if frame.ktcheck.GetValue() == True:  # 查國外
+        # if frame.chkProfit.GetValue() == True:  # 查國外
         #     ret_code = self.Yuanta.YuantaOrd.RfReportQuery(bhon, account, ae_no,
         #                                                    frame.ordstatus_combo.GetString(
         #                                                        frame.ordstatus_combo.GetSelection())[0:1],
@@ -1522,7 +1631,7 @@ class StockBot:
         frame.Logmessage("ReportQuery() return = {}".format(ret_code))
 
     def send_matQuery(self, bhon, account, ae_no):
-        # if frame.ktcheck.GetValue() == True:  # 查國外
+        # if frame.chkProfit.GetValue() == True:  # 查國外
         #     ret_code = self.Yuanta.YuantaOrd.RfDealQuery(
         #         bhon, account, ae_no, '*')
         #     frame.Logmessage("RfDealQuery() return = {}".format(ret_code))
@@ -1775,20 +1884,17 @@ class MyApp(wx.App):
             # 5️⃣ Idle 與節流 time.sleep(防止 CPU 滿載)
             try:
                 # time.sleep(0.1)
-                if wx.GetApp() and wx.GetApp().IsMainLoopRunning():
-                    evtloop.ProcessIdle()
-            except wx._core.wxAssertionError:
-                print("⚠️ wxAssertionError: 已關閉 GUI，停止事件循環。")
+                # if wx.GetApp() and wx.GetApp().IsMainLoopRunning():
+                evtloop.ProcessIdle()
+            except (wx._core.wxAssertionError, RuntimeError):
+            # GUI 已經關閉 / 控制項被刪除，直接跳出，不再 print，避免觸發 RedirectText
                 break
-            except RuntimeError:
-                print("⚠️ GUI 已被銷毀，跳出事件循環。")
-                break
-            except Exception as e:
-                print(f"Idle 處理錯誤: {e}")
+            except Exception:
+                # 其他錯誤一樣直接跳出，避免再寫入已死掉的 TextCtrl
                 break
 
         wx.EventLoop.SetActive(old)
-        print("✅ MainLoop 已正常結束。")
+        # print("✅ MainLoop 已正常結束。")   # 這裡也不要 print，因為 sys.stdout 可能還是被導向 TextCtrl
 
 
     def OnInit(self):

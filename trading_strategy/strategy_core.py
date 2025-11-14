@@ -4,6 +4,11 @@ strategy_core.py
 TradingStrategy 主體：接收 tick、計算均價、產生訊號，並呼叫 OrderManager/Notifier/UIUpdater。
 """
 
+from .calculator import parse_time_string, to_ms, calc_fibonacci_levels
+from .log_cleaner import cleanup_yuanta_logs, clean_logs_except_today
+from .order_manager import OrderManager
+from .ui_updater import UIUpdater
+from .notifier import Notifier, RedirectText
 import sys
 import json
 import threading  # 預留給未來背景工作（目前沒有使用，但保留結構）
@@ -31,6 +36,7 @@ COLORAMA_MAP = {
     "Back.GREEN": Back.GREEN,
 }
 
+
 def resolve_color(color_string: str) -> str:
     """
     將像是 "Fore.RED + Style.BRIGHT" 這類字串，安全轉成 colorama ANSI 字串。
@@ -42,18 +48,13 @@ def resolve_color(color_string: str) -> str:
     if not color_string:
         return ""
     parts = [p.strip() for p in color_string.split("+")]
-    out=""
+    out = ""
     for p in parts:
         if p in COLORAMA_MAP:
-            out+=COLORAMA_MAP[p]
+            out += COLORAMA_MAP[p]
     return out
 # === 安全顏色解析器結束 ===
 
-from .calculator import parse_time_string, to_ms, calc_fibonacci_levels
-from .notifier import Notifier, RedirectText
-from .ui_updater import UIUpdater
-from .order_manager import OrderManager
-from .log_cleaner import cleanup_yuanta_logs, clean_logs_except_today
 
 class TradingStrategy:
     """
@@ -98,8 +99,9 @@ class TradingStrategy:
         config = load_json("./config.json")
         self.notifier = Notifier(
             frame=self.frame,
-            telegram_token= config.get("telegram_token"),  # Telegram 機器人 token
-            telegram_chat_id= config.get("telegram_chat_id"),  # Telegram 接收訊息的 chat_id
+            telegram_token=config.get("telegram_token"),  # Telegram 機器人 token
+            telegram_chat_id=config.get(
+                "telegram_chat_id"),  # Telegram 接收訊息的 chat_id
         )
         # UI 更新物件：只專心負責更新各種 Grid / Label
         self.ui = UIUpdater(self.frame)
@@ -169,7 +171,12 @@ class TradingStrategy:
         # 11) 舊版相容：給 YuantaOrdAPI.OnChkDeal 用的費波字串
         #     代表「當前多單 / 空單採用的那組 fibonacci 價格」
         self.fibonacci_chkBuy_str: str = "0"   # 目前多單使用的 Fibonacci 字串
-        self.fibonacci_chkSell_str: str = "0"  # 目前空單使用的 Fibonacci 字串        
+        self.fibonacci_chkSell_str: str = "0"  # 目前空單使用的 Fibonacci 字串
+
+        # 給 YuantaOrdAPI.Onktcheck 用的停利字串
+        # 代表「當前多單 / 空單採用的那組 停利 價格」
+        # self.stop_profit_chkBuy_str: str = "0"   # 目前多單使用的 停利 字串
+        # self.stop_profit_chkSell_str: str = "0"  # 目前空單使用的 停利 字串
 
         # 啟動程式時清理一次，保留 3 天
         cleanup_yuanta_logs(".", keep_days=3)
@@ -297,13 +304,16 @@ class TradingStrategy:
         """
         # 如果這個商品是第一次出現，先進行初始化
         if not database:
-            database["current_total_volume"] = float(TolMatchQty)  # 當前商品目前看到的總成交量
-            database["total_volume"] = float(MatchQty)             # 本策略開始以來累積的成交量
+            database["current_total_volume"] = float(
+                TolMatchQty)  # 當前商品目前看到的總成交量
+            database["total_volume"] = float(
+                MatchQty)             # 本策略開始以來累積的成交量
             database["match_pri"] = self.new_price                 # 最新成交價
 
             # 解析時間字串，存成毫秒
             h, m, s, ms = parse_time_string(MatchTime)
-            database["pre_matchtime"] = to_ms(h, m, s, ms)         # 記錄本商品上一筆 tick 的時間（初始化）
+            database["pre_matchtime"] = to_ms(
+                h, m, s, ms)         # 記錄本商品上一筆 tick 的時間（初始化）
 
             # 同時更新全市場的日高 / 日低
             hp = int(HighPri)
@@ -319,14 +329,17 @@ class TradingStrategy:
         # 之後每次 tick，如果看到的總成交量有變大，表示有新增成交量
         elif database["current_total_volume"] < float(TolMatchQty):
             self.group_size += 1                                   # 本區間內累積的 tick 數 +1
-            database["current_total_volume"] = float(TolMatchQty)  # 更新目前看到的總成交量
-            database["total_volume"] += float(MatchQty)            # 將本筆成交量加到累積量
+            database["current_total_volume"] = float(
+                TolMatchQty)  # 更新目前看到的總成交量
+            # 將本筆成交量加到累積量
+            database["total_volume"] += float(MatchQty)
             database["match_pri"] = self.new_price                 # 記錄最新成交價
 
             # 計算本筆與前一筆 tick 的時間差，累積到 matchtime
             h, m, s, ms = parse_time_string(MatchTime)
             now_ms = to_ms(h, m, s, ms)
-            diff = abs(now_ms - database["pre_matchtime"])        # 本筆距離前一筆的時間差（毫秒）
+            # 本筆距離前一筆的時間差（毫秒）
+            diff = abs(now_ms - database["pre_matchtime"])
 
             # 過濾隔夜數據：若時間差過大（可能是 23:59 → 00:00），則不納入本日計算
             if diff < 50000000:
@@ -513,7 +526,8 @@ class TradingStrategy:
         # ===== 放空：等反彈到預設放空價（含）以上 =====
         # sell_signal：代表之前 signal_trade 判斷過一次「有空點」，但尚未真正進場。
         if getattr(self.order, "sell_signal", False) and not getattr(self.order, "trading_sell", False):
-            entry = int(getattr(self.order, "entry_price_sell", 0) or 0)  # 預設放空價
+            entry = int(getattr(self.order, "entry_price_sell", 0)
+                        or 0)  # 預設放空價
             if entry > 0 and price > entry:
                 # 觸價成交 log
                 self.notifier.log(
@@ -530,7 +544,8 @@ class TradingStrategy:
 
         # ===== 作多：等回檔到預設作多價（含）以下 =====
         if getattr(self.order, "buy_signal", False) and not getattr(self.order, "trading_buy", False):
-            entry = int(getattr(self.order, "entry_price_buy", 0) or 0)  # 預設作多價
+            entry = int(getattr(self.order, "entry_price_buy", 0)
+                        or 0)  # 預設作多價
             if entry > 0 and price < entry:
                 self.notifier.log(
                     f"{MatchTime}  作多觸價成交 現價:{price}  觸發價:{entry}",
@@ -586,20 +601,26 @@ class TradingStrategy:
 
         # ===== 1) 收盤 / 量 / 均價列表更新 =====
         self.list_close_price.append(self.new_price)
-        self.list_temp_tickbars_total_volume.append(self.temp_tickbars_total_volume)
-        self.list_temp_tickbars_avg_price.append(int(self.temp_tickbars_avg_price))
+        self.list_temp_tickbars_total_volume.append(
+            self.temp_tickbars_total_volume)
+        self.list_temp_tickbars_avg_price.append(
+            int(self.temp_tickbars_avg_price))
 
         # 更新 GUI 的當前區間量與均價
-        self.frame.compareInfoGrid.SetCellValue(0, 3, str(int(self.temp_tickbars_total_volume)))
-        self.frame.compareInfoGrid.SetCellValue(0, 4, str(int(self.temp_tickbars_avg_price)))
+        self.frame.compareInfoGrid.SetCellValue(
+            0, 3, str(int(self.temp_tickbars_total_volume)))
+        self.frame.compareInfoGrid.SetCellValue(
+            0, 4, str(int(self.temp_tickbars_avg_price)))
 
         self.list_tickbars_tol_time.append(tol_time)
         self.frame.compareInfoGrid.SetCellValue(0, 2, tol_time_str)
 
         # ===== 2) 高低價來源：有區間資料用區間，否則用現價 =====
         if self.temp_price_compare_database:
-            self.list_temp_tickbars_big_price.append(self.temp_price_compare_database['big_value'])
-            self.list_temp_tickbars_small_price.append(self.temp_price_compare_database['small_value'])
+            self.list_temp_tickbars_big_price.append(
+                self.temp_price_compare_database['big_value'])
+            self.list_temp_tickbars_small_price.append(
+                self.temp_price_compare_database['small_value'])
         else:
             self.list_temp_tickbars_big_price.append(self.new_price)
             self.list_temp_tickbars_small_price.append(self.new_price)
@@ -693,7 +714,8 @@ class TradingStrategy:
                 self.suspected_buy = True
 
             # ===== 放空進場訊號：作空等反彈，使用 Fibonacci 第四階 (sell_levels[3]) 作為預設進場價 =====
-            sell_levels = [s.strip() for s in self.fibonacci_sell_str.split(":") if s.strip().isdigit()]
+            sell_levels = [s.strip() for s in self.fibonacci_sell_str.split(
+                ":") if s.strip().isdigit()]
             if (
                 self.suspected_sell
                 and temp_highest_arrow == "↓"
@@ -720,7 +742,8 @@ class TradingStrategy:
                 self.suspected_sell = False  # 本次頭部訊號已處理完，重置旗標
 
             # ===== 作多進場訊號：作多等回檔，使用 Fibonacci 第四階 (buy_levels[3]) 作為預設進場價 =====
-            buy_levels = [s.strip() for s in self.fibonacci_buy_str.split(":") if s.strip().isdigit()]
+            buy_levels = [s.strip() for s in self.fibonacci_buy_str.split(
+                ":") if s.strip().isdigit()]
             if (
                 self.suspected_buy
                 and temp_lowest_arrow == "↑"
@@ -752,7 +775,8 @@ class TradingStrategy:
             color_main = Fore.GREEN  # 整體主色偏綠（空方）
             if any(c in temp for c in ["進場多", "進場空"]):
                 # 若 temp 文字裡有進場訊號，trend_color 依多空調整
-                trend_color = Fore.GREEN if any(c in temp for c in "空") else Fore.RED
+                trend_color = Fore.GREEN if any(
+                    c in temp for c in "空") else Fore.RED
             else:
                 trend_color = Fore.GREEN
                 mark_temp_close_price_color = "Fore.GREEN + Style.BRIGHT"
@@ -771,7 +795,8 @@ class TradingStrategy:
             self.trending_down = False
             color_main = Fore.RED  # 整體主色偏紅（多方）
             if any(c in temp for c in ["進場多", "進場空"]):
-                trend_color = Fore.RED if any(c in temp for c in "多") else Fore.GREEN
+                trend_color = Fore.RED if any(
+                    c in temp for c in "多") else Fore.GREEN
             else:
                 trend_color = Fore.RED
                 mark_temp_close_price_color = "Fore.RED + Style.BRIGHT"
@@ -815,10 +840,12 @@ class TradingStrategy:
             self.temp_howeverHighest_total_volume = 0
             self.temp_TXF_MXF_howeverHighest = 0
             self.temp_howeverHighest_avg_price = 0
+            self.fibonacci_chkSell_str = "0"  # 目前空單使用的 Fibonacci 字串
         else:
             self.temp_howeverLowest_total_volume = 0
             self.temp_TXF_MXF_howeverLowest = 0
             self.temp_howeverLowest_avg_price = 0
+            self.fibonacci_chkBuy_str = "0"   # 目前多單使用的 Fibonacci 字串
 
     def _accumulate_however_high(self) -> None:
         """
@@ -915,7 +942,8 @@ class TradingStrategy:
                 key_price=keypri
             )
             # 轉成字串，方便舊版程式或 log 使用
-            self.fibonacci_sell_str = " : ".join(str(v) for v in levels["sell"])
+            self.fibonacci_sell_str = " : ".join(
+                str(v) for v in levels["sell"])
             self.fibonacci_buy_str = " : ".join(str(v) for v in levels["buy"])
             # 更新 GUI 費波 Grid
             self.ui.update_fibonacci_grid(levels["sell"], levels["buy"])
@@ -1019,6 +1047,7 @@ class TradingStrategy:
         #         f"止損: {int(self.order.stopLoss_buy)}  "
         #         f"停利: {self.order.profit_buy_str}{Style.RESET_ALL}"
         #     )
+
 
 def load_json(fpath):
     with open(fpath, "r", encoding="UTF-8") as f:
