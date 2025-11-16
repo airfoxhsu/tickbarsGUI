@@ -22,7 +22,8 @@ from functools import partial
 user32 = windll.user32
 atl = windll.atl
 q = queue.Queue()
-ts=None
+ts = None
+
 
 class AppFrame(wx.Frame):
     """
@@ -43,7 +44,7 @@ class AppFrame(wx.Frame):
         self.Username = config["username"]
         self.Password = config["password"]
         self.Host = "203.66.93.84"
-        self.Port = 443 
+        self.Port = 443
 
         self.waitMinuteToSMS = True   # 等待分鐘數重置簡訊發送
         self.last_userdefine_source = None  # 紀錄最後一次通用查詢的來源
@@ -101,23 +102,22 @@ class AppFrame(wx.Frame):
         self.bscode1_combo.SetSelection(1)
 
         wx.StaticText(pnl, label='商品', pos=(141, 130))
-        data = load_json("./code.json")
-        choice_symbols = data["stock"]
+        # data = load_json("./code.json")
+        # choice_symbols = data["future"]
         self.futno1_combo = wx.Choice(
-            pnl, choices=choice_symbols, pos=(180, 127), size=(70, 23))
-        self.futno1_combo.SetSelection(1)
+            pnl, choices=["無"], pos=(180, 127), size=(70, 23))
+        # self.futno1_combo.SetSelection(1)
 
         wx.StaticText(pnl, label='價格', pos=(271, 130))
         self.price_combo = wx.ComboBox(
             pnl, choices=['0'], pos=(310, 127), size=(70, 23),
             style=wx.CB_DROPDOWN | wx.TE_PROCESS_ENTER
-        )        
+        )
         self.price_combo.SetSelection(0)
         # 限制鍵盤輸入（只能按數字、Backspace、方向鍵）
         self.price_combo.Bind(wx.EVT_CHAR, self.OnComboNumberOnly)
         # Enter 觸發驗證（最多五位，轉成有效數字）
         self.price_combo.Bind(wx.EVT_TEXT_ENTER, self.OnComboEnterValidate)
-
 
         wx.StaticText(pnl, label='數量', pos=(391, 130))
         self.lots_combo = wx.Choice(
@@ -168,7 +168,7 @@ class AppFrame(wx.Frame):
         self.pritype_cond.SetSelection(0)
 
         order = wx.Button(pnl, wx.ID_ANY, label='下單',
-                          pos=(578, 126), size=(50, 25))       
+                          pos=(578, 126), size=(50, 25))
         order.Bind(wx.EVT_BUTTON, partial(
             self.OnOrderBtn, S_Buys=None, price=None, offset=None))
 
@@ -255,8 +255,8 @@ class AppFrame(wx.Frame):
         wx.StaticBox(pnl, label='API商品資訊', pos=(670, 1), size=(565, 60))
         wx.StaticText(pnl, label='商品代碼', pos=(680, 30))
         self.symbol = wx.TextCtrl(pnl, pos=(740, 26), size=(120, 25))
-        code_list = ",".join(load_json("./code.json")["stock"])
-        self.symbol.SetValue(code_list)
+        # code_list = ",".join(load_json("./code.json")["future"])
+        # self.symbol.SetValue(code_list)
 
         self.rbAm = wx.RadioButton(
             pnl, 1, label='日盤', pos=(870, 30), style=wx.RB_GROUP)
@@ -502,11 +502,11 @@ class AppFrame(wx.Frame):
 
         self.compareInfoGrid.SetDefaultCellBackgroundColour('BLACK')
         self.compareInfoGrid.AutoSizeColumns()
-        self.compareInfoGrid.EnableEditing(True)    #   整張表格可編輯
-        for r in range(self.compareInfoGrid.GetNumberRows()):    #   再把其他表格鎖起來
+        self.compareInfoGrid.EnableEditing(True)  # 整張表格可編輯
+        for r in range(self.compareInfoGrid.GetNumberRows()):  # 再把其他表格鎖起來
             for c in range(self.compareInfoGrid.GetNumberCols()):
                 self.compareInfoGrid.SetReadOnly(r, c, True)
-        self.compareInfoGrid.SetReadOnly(0, 6, False)     #    最後開放你要輸入的這一格
+        self.compareInfoGrid.SetReadOnly(0, 6, False)  # 最後開放你要輸入的這一格
 
         attr_yellow = wx.grid.GridCellAttr()
         attr_yellow.SetTextColour(wx.YELLOW)
@@ -584,23 +584,26 @@ class AppFrame(wx.Frame):
 
         # 允許 Backspace
         if key == wx.WXK_BACK:
-            event.Skip(); return
+            event.Skip()
+            return
 
         # 允許 Enter
         if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
-            event.Skip(); return
+            event.Skip()
+            return
 
         # 允許方向鍵
         if key in (wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_UP, wx.WXK_DOWN):
-            event.Skip(); return
+            event.Skip()
+            return
 
         # 允許 0–9（主鍵盤 + 小鍵盤）
         if (48 <= key <= 57) or (wx.WXK_NUMPAD0 <= key <= wx.WXK_NUMPAD9):
-            event.Skip(); return
+            event.Skip()
+            return
 
         # ❌ 阻擋其他按鍵
         return
-
 
     def OnComboEnterValidate(self, event):
         combo = event.GetEventObject()   # ⭐ 自動抓到 price_combo 或 ktprice_combo
@@ -630,8 +633,6 @@ class AppFrame(wx.Frame):
         self.Logmessage(f"{combo_name}價格生效：{filtered}")
 
         return  # 不 Skip → 不會 beep
-
-
 
     def OnClose(self, event):
         app = wx.GetApp()
@@ -681,7 +682,7 @@ class AppFrame(wx.Frame):
         # 2. 執行回測主流程（用 try，但不要吃光）
         try:
             self.monitorTradeSignal.Clear()
-            
+
             # ts.__init__(frame)
 
             print(f"你選擇的回測檔案是: {filename}")
@@ -711,7 +712,7 @@ class AppFrame(wx.Frame):
                             session = get_session(tick_time)
                         except ValueError:
                             continue  # 跳過不是數字的欄位
-                        
+
                          # 不在交易時間：標記需要重置，然後略過
                         if session is None:
                             if current_session is not None:
@@ -833,7 +834,7 @@ class AppFrame(wx.Frame):
                 self.price_combo.SetItems(new_choices)
                 self.price_combo.SetSelection(0)
             if self.chkProfit.IsChecked():
-                self.OnChkProfit(None)    
+                self.OnChkProfit(None)
         elif cb == self.chkBuy and self.chkBuy.IsChecked():
             self.chkSell.SetValue(False)
             self.bscode1_combo.SetSelection(0)  # B-買進
@@ -848,16 +849,16 @@ class AppFrame(wx.Frame):
                 self.price_combo.SetItems(new_choices)
                 self.price_combo.SetSelection(0)
             if self.chkProfit.IsChecked():
-                self.OnChkProfit(None)    
+                self.OnChkProfit(None)
         else:
             new_choices = ["0"]  # 或給預設選單
             self.price_combo.SetItems(new_choices)
             self.price_combo.SetSelection(0)
             if self.chkProfit.IsChecked():
-                self.chkProfit.SetValue(False) 
+                self.chkProfit.SetValue(False)
                 new_choices = ["0"]  # 或給預設選單
                 self.ktprice_combo.SetItems(new_choices)
-                self.ktprice_combo.SetSelection(0)   
+                self.ktprice_combo.SetSelection(0)
 
     def OnLogonBtn(self, event):
         LogonJob(Job.LOGON, self.acc.GetValue(), self.pwd.GetValue())
@@ -954,7 +955,7 @@ class AppFrame(wx.Frame):
             # 空單停利目標三段價位字串
             if ts.order.profit_sell_str and ts.order.profit_sell_str.strip() != "0":
                 new_choices = [s.strip()
-                            for s in ts.order.profit_sell_str.split(":")]
+                               for s in ts.order.profit_sell_str.split(":")]
                 self.ktprice_combo.SetItems(new_choices)
                 self.ktprice_combo.SetSelection(2)
             else:
@@ -972,7 +973,7 @@ class AppFrame(wx.Frame):
             # 多單停利目標三段價位字串
             if ts.order.profit_buy_str and ts.order.profit_buy_str.strip() != "0":
                 new_choices = [s.strip()
-                            for s in ts.order.profit_buy_str.split(":")]
+                               for s in ts.order.profit_buy_str.split(":")]
                 self.ktprice_combo.SetItems(new_choices)
                 self.ktprice_combo.SetSelection(2)
             else:
@@ -982,12 +983,12 @@ class AppFrame(wx.Frame):
         # else:
         #     new_choices = ["0"]  # 或給預設選單
         #     self.ktprice_combo.SetItems(new_choices)
-        #     self.ktprice_combo.SetSelection(0)  
+        #     self.ktprice_combo.SetSelection(0)
         elif self.chkProfit.IsChecked():
             self.chkProfit.SetValue(False)
             new_choices = ["0"]  # 或給預設選單
             self.ktprice_combo.SetItems(new_choices)
-            self.ktprice_combo.SetSelection(0)  
+            self.ktprice_combo.SetSelection(0)
             # self.textktprice.Show(False)
             # self.ktprice_combo.Show(False)
             # self.textbs2.Show(False)
@@ -997,12 +998,12 @@ class AppFrame(wx.Frame):
             self.chkProfit.SetValue(False)
             new_choices = ["0"]  # 或給預設選單
             self.ktprice_combo.SetItems(new_choices)
-            self.ktprice_combo.SetSelection(0)  
+            self.ktprice_combo.SetSelection(0)
             # self.textktprice.Show(False)
             # self.ktprice_combo.Show(False)
             # self.textbs2.Show(False)
             # self.bscode2_combo.Show(False)
-            # self.Logmessage("未勾選作空或作多")    
+            # self.Logmessage("未勾選作空或作多")
 
     def Logmessage(self, msg):
         # 如果是 Exception，就轉成字串
@@ -1030,15 +1031,15 @@ class AppFrame(wx.Frame):
             if self.is_day() and not self.is_day_port():
                 self.Port = 443
                 # msg = "Change connection port to 443."
-                msg = "切換日盤port to 443並初始化數據."
-                self.Logmessage(msg)
+                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  切換日盤port to 443並初始化數據."
                 ts.__init__(frame)
+                self.Logmessage(msg)
                 self.ConnectionQuote(None)
             elif not self.is_day() and self.is_day_port():
                 self.Port = 442
-                msg = "切換夜盤port to 442並初始化數據."
-                self.Logmessage(msg)
+                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  切換夜盤port to 442並初始化數據."
                 ts.__init__(frame)
+                self.Logmessage(msg)
                 self.ConnectionQuote(None)
             time.sleep(60)
 
@@ -1069,7 +1070,7 @@ class AppFrame(wx.Frame):
         now = self.get_time()
         # now = datetime.datetime.now()
         day_begin = now.replace(hour=7, minute=50, second=0)
-        day_end = now.replace(hour=14, minute=45, second=0)
+        day_end = now.replace(hour=14, minute=50, second=0)
 
         if now < day_begin:
             return False
@@ -1107,27 +1108,64 @@ class AppFrame(wx.Frame):
         return t
 
     # 計算選擇權商品代碼
-    def XXF(self):
+    def get_month_code(self):
         """計算期貨商品代碼"""
-        today = datetime.date.today()
-        day = datetime.date.today().replace(day=1)
-
+        # today = datetime.date.today()
+        # day = datetime.date.today().replace(day=1)
+        """計算期貨商品代碼（本月第三個星期三 14:00 後 → 切換到下個月合約）"""
+        # 現在時間（含時分秒）
+        now = datetime.datetime.now()
+        # 本月 1 號的 datetime
+        day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        # 找到本月第一個星期三（weekday=2）
         while day.weekday() != 2:
             day = day + datetime.timedelta(days=1)
+        # 第一個星期三 + 14 天 = 第三個星期三
         day = day + dateutil.relativedelta.relativedelta(days=14)
-
-        if day < today:
-            day = day + dateutil.relativedelta.relativedelta(months=1)
-
+        # if day < today:
+        #     day = day + dateutil.relativedelta.relativedelta(months=1)
+        # 將時間設成 14:00
+        third_wed_14 = day.replace(hour=14, minute=0, second=0, microsecond=0)
+        # 若現在時間 >= 第三個星期三 14:00 → 使用下個月合約
+        if now >= third_wed_14:
+            third_wed_14 += dateutil.relativedelta(months=1)
+        # Month code mapping（依你的券商規則 A～L)
         codes = "ABCDEFGHIJKL"
+        # 年份最後一碼
         y = day.year % 10
+        # 月份代碼字母
         m = codes[day.month - 1]
 
         return f"{m}{y}"
     # 計算期貨商品代碼
 
-    def XF(self, code):
-        return f"{code}{self.XXF()}"
+    def generate_codes_and_save(self):
+        """
+        自動產生 TXF、MXF 商品代碼，並寫入 code.json。
+
+        JSON 格式：
+        {
+            "future": ["TXFK5", "MXFK5"]
+        }
+        """
+        month_code = self.get_month_code()   # 取得像 K5、M4 這種月碼
+
+        txf_code = f"TXF{month_code}"
+        mxf_code = f"MXF{month_code}"
+
+        data = {
+            "future": [txf_code, mxf_code]
+        }
+
+        # 寫入 JSON
+        with open("code.json", "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+
+        self.Logmessage(f"{datetime.datetime.now().strftime('%H:%M:%S')}  已產生並寫入 code.json：{data}")
+        return data
+
+    # def XF(self, code):
+    #     return f"{code}{self.XXF()}"
 
     def reset_waitMinuteToSMS(self):
         self.waitMinuteToSMS = True
@@ -1254,10 +1292,10 @@ class YuantaQuoteEvents(object):
         }
 
         if Status < 0:
-            msg = f"{link_status.get(Status)}: Try to login again."
+            msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  {link_status.get(Status)}: Try to login again."
             frame.Logmessage(msg)
             if frame.is_trade_time():
-                msg = "Reconnection in trade time will be wait for 1 second"
+                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  Reconnection in trade time will be wait for 1 second"
                 if frame.waitMinuteToSMS:
                     frame.waitMinuteToSMS = False
                     bot_message = f"{datetime.datetime.now().strftime('%H:%M:%S')}  網路中斷,目前在交易時間內請檢查連線狀況"
@@ -1267,30 +1305,39 @@ class YuantaQuoteEvents(object):
                 frame.Logmessage(msg)
                 time.sleep(1)
             else:
-                msg = "Reconnection beyond trade time will wait for 1 minutes"
+                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  Reconnection beyond trade time will wait for 1 minutes"
                 frame.Logmessage(msg)
                 time.sleep(60)
-            frame.ConnectionQuote(None)
+            if Status == -1:
+                frame.ConnectionQuote(None)
 
         if Status != 2:
             return
 
-        code_list = load_json("./code.json")
-        for code in code_list["stock"]:
-            result = Bot.YuantaQ.YuantaQuote.AddMktReg(
-                code, 2, ReqType, 0)
-            msg = f"Registered {code}, result: {result}"
-            frame.Logmessage(msg)
-        msg = "Stock registration done."
-        frame.Logmessage(msg)
+        # code_list = load_json("./code.json")
+        # for code in code_list["stock"]:
+        #     result = Bot.YuantaQ.YuantaQuote.AddMktReg(
+        #         code, 2, ReqType, 0)
+        #     msg = f"Registered {code}, result: {result}"
+        #     frame.Logmessage(msg)
+        # msg = "Stock registration done."
+        # frame.Logmessage(msg)
+
+        code_list = frame.generate_codes_and_save()
+        choice_symbols = code_list["future"]
+        frame.futno1_combo.SetItems(choice_symbols)
+        frame.futno1_combo.SetSelection(1)
+
+        data = ",".join(choice_symbols)
+        frame.symbol.SetValue(data)
 
         for code in code_list["future"]:
-            code = frame.XF(code)
+            # code = frame.XF(code)
             result = Bot.YuantaQ.YuantaQuote.AddMktReg(
                 code, 2, ReqType, 0)
             msg = f"Registered {code}, result: {result}"
             frame.Logmessage(msg)
-        msg = "Future registration done."
+        msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  Future registration done."
         frame.Logmessage(msg)
 
     def OnRegError(self, this, symbol, updmode, ErrCode, ReqType):
@@ -1444,7 +1491,7 @@ class StockBot:
     def logon_quote(self, Username, Password, Host, Port):
         # T port 80/443 , T+1 port 82/442 ,  reqType=1 T盤 , reqType=2  T+1盤
         reqType = "日盤" if Port == 443 or Port == 80 else "夜盤"
-        msg = f"連接報價行情主機  {Host}:{Port}  {reqType}"
+        msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  連接報價行情主機  {Host}:{Port}  {reqType}"
         frame.Logmessage(msg)
         self.YuantaQ.YuantaQuote.SetMktLogon(Username, Password,
                                              Host, Port, 1, 0)
@@ -1887,7 +1934,7 @@ class MyApp(wx.App):
                 # if wx.GetApp() and wx.GetApp().IsMainLoopRunning():
                 evtloop.ProcessIdle()
             except (wx._core.wxAssertionError, RuntimeError):
-            # GUI 已經關閉 / 控制項被刪除，直接跳出，不再 print，避免觸發 RedirectText
+                # GUI 已經關閉 / 控制項被刪除，直接跳出，不再 print，避免觸發 RedirectText
                 break
             except Exception:
                 # 其他錯誤一樣直接跳出，避免再寫入已死掉的 TextCtrl
@@ -1895,7 +1942,6 @@ class MyApp(wx.App):
 
         wx.EventLoop.SetActive(old)
         # print("✅ MainLoop 已正常結束。")   # 這裡也不要 print，因為 sys.stdout 可能還是被導向 TextCtrl
-
 
     def OnInit(self):
         self.keepGoing = True
@@ -2020,7 +2066,7 @@ if __name__ == "__main__":
     frame.Show(True)
     Bot = StockBot(frame.Handle)
     # ts = trading_strategy_calc.TradingStrategy(frame)
-    # threading.Thread(target=frame.UpdateDayNight, daemon=True).start()
+    threading.Thread(target=frame.UpdateDayNight, daemon=True).start()
     app.MainLoop(run_job)
 
 """

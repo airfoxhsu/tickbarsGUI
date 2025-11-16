@@ -71,6 +71,18 @@ class OrderManager:
         self.buy_signal: bool = False    # 是否目前有「多單進場訊號」
         self.sell_signal: bool = False   # 是否目前有「空單進場訊號」
 
+    def _safe_order(self, side, price, offset):
+        """安全封裝，確保所有傳入 OnOrderBtn 的參數都是字串。"""
+        try:
+            self.frame.OnOrderBtn(
+                event=None,
+                S_Buys=str(side),
+                price=str(price),
+                offset=str(offset),
+            )
+        except Exception as e:
+            self.notifier.error(f"OnOrderBtn 失敗: {e}")    
+
     # ========= 進場 =========
     # 產生進場訊號（不送單）
     def signal_trade(
@@ -115,7 +127,7 @@ class OrderManager:
         """
         # 計算三段停利價位（profit_1, profit_2, profit_3）
         p1, p2, p3 = calc_profit_targets(entry_price, stop_loss, direction)
-        profits = [p1,p2,p3]
+        profits = [p1, p2, p3]
         # 將 Fibonacci 價格字串拆成清單，並去除空白與空字串
         levels = [s.strip() for s in fibonacci_str.split(":") if s.strip()]
 
@@ -131,7 +143,7 @@ class OrderManager:
             # 使用第 4 段 Fibonacci 作為「主訊號價」顯示（呼叫者既有邏輯）
             label = f"進場多: {levels[3] if len(levels) > 3 else entry_price}"
             if self.frame.chkBuy.IsChecked() and fibonacci_str and levels:
-                self.ui.set_price_combo_items(levels,profits)
+                self.ui.set_price_combo_items(levels, profits)
         else:
             row = 0                   # GUI 訊號列的「空單」所在列索引
             color = wx.GREEN          # 空單訊號顯示為綠色
@@ -141,12 +153,12 @@ class OrderManager:
             self.profit_sell_str = f"{p1}:{p2}:{p3}"
             label = f"進場空: {levels[3] if len(levels) > 3 else entry_price}"
             if self.frame.chkSell.IsChecked() and fibonacci_str and levels:
-                self.ui.set_price_combo_items(levels,profits)
-
+                self.ui.set_price_combo_items(levels, profits)
 
         # === UI 顯示更新 ===
         # 在 GUI 訊號列中顯示：進場價 / 止損 / 三段停利價位
-        self.ui.update_signal_row(row, entry_price, stop_loss, p1, p2, p3, color)
+        self.ui.update_signal_row(
+            row, entry_price, stop_loss, p1, p2, p3, color)
 
         # === Fibonacci 價格設定 ===
         # 若有提供 Fibonacci 價格，更新 GUI 上的價格選單。
@@ -226,12 +238,11 @@ class OrderManager:
                 # 檢查 GUI 上「是否允許自動下單」
                 if ((direction == "多" and self.frame.chkBuy.IsChecked()) or
                         (direction == "空" and self.frame.chkSell.IsChecked())):
-                    # 實際呼叫 Yuanta API 下單
-                    self.frame.OnOrderBtn(
-                        event=None,
-                        S_Buys=side,
-                        price=price,
-                        offset=offset,
+                    # 實際呼叫 Yuanta API 下單                   
+                    self._safe_order(
+                        side=str(side),
+                        price=str(price),
+                        offset=str(offset),
                     )
                     # 下單後將口數標記為「未連」，等下一次更新
                     self.frame.qtyLabel.SetLabel("未連")
@@ -302,17 +313,15 @@ class OrderManager:
                     val = self.frame.qtyLabel.GetLabel()
                     qty = int(val) if val.isdigit() else 0
                     if qty > 0:
-                        self.frame.OnOrderBtn(
-                            event=None,
-                            S_Buys=side,
-                            price=int(price),
-                            offset="1",  # 1 = 平倉
-                        )
+                        self._safe_order(
+                        side=str(side),
+                        price=str(price),
+                        offset=str("1"),
+                          )
                         self.frame.qtyLabel.SetLabel("未連")
 
         except Exception:  # noqa: BLE001
             self.notifier.error("止損平倉下單失敗，請檢查 OnOrderBtn 或價位設定。")
-
 
         msg = f"{match_time}  {text}: {int(price)}  平倉不悔"
         self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
@@ -356,18 +365,15 @@ class OrderManager:
                     val = self.frame.qtyLabel.GetLabel()
                     qty = int(val) if val.isdigit() else 0
                     if qty > 0:
-                        self.frame.OnOrderBtn(
-                            event=None,
-                            S_Buys=side,
-                            price=price,
-                            offset="1",  # 1 = 平倉
-                        )
+                        self._safe_order(
+                        side=str(side),
+                        price=str(price),
+                        offset=str("1"),
+                          )
                         self.frame.qtyLabel.SetLabel("未連")
-
 
         except Exception:  # noqa: BLE001
             self.notifier.error("停利平倉下單失敗，請檢查 OnOrderBtn。")
-
 
         # 平倉後重置持倉與訊號狀態
         if direction == "多":
@@ -417,9 +423,21 @@ class OrderManager:
             p1, p2, p3 = parse_profit_triplet(self.profit_sell_str)
             if p1 and p2 and p3 and self.entry_price_sell:
                 if self.frame.chkProfit.IsChecked():
-                    p = int(self.frame.ktprice_combo.GetValue() or 0)
+                    raw = self.frame.ktprice_combo.GetValue()
+                    # === 保護 1：空白 → 不啟動此模式 ===
+                    if not raw or not raw.strip():
+                        return
+                    # === 保護 2：必須是純數字 ===
+                    if not raw.isdigit():
+                        self.notifier.log(
+                            f"{match_time} ⚠️ 警告：KT Price 不是合法數字 → 忽略單一停利模式",
+                            Fore.YELLOW + Style.BRIGHT,
+                        )
+                        return
+                    p = int(raw)
                     if price <= p:
-                        self._exit_takeprofit_all("空", price, match_time,str(p))
+                        self._exit_takeprofit_all(
+                            "空", price, match_time, str(p))
                     # elif price <= p2:
                     #     self._exit_takeprofit_all("空", price, match_time,"profit_2")
                     # elif price <= p3:
@@ -439,17 +457,30 @@ class OrderManager:
                             Fore.CYAN + Style.BRIGHT,
                         )
                     elif price <= p3:
-                        self._exit_takeprofit_all("空", price, match_time,"profit_3")
+                        self._exit_takeprofit_all(
+                            "空", price, match_time, "profit_3")
 
         # === 多單移動停損 ===
         if self.trading_buy and self.profit_buy_str:
             p1, p2, p3 = parse_profit_triplet(self.profit_buy_str)
             if p1 and p2 and p3 and self.entry_price_buy:
                 if self.frame.chkProfit.IsChecked():
-                    p = int(self.frame.ktprice_combo.GetValue() or 0)
+                    raw = self.frame.ktprice_combo.GetValue()
+                    # === 保護 1：空白 → 不啟動此模式 ===
+                    if not raw or not raw.strip():
+                        return
+                    # === 保護 2：必須是純數字 ===
+                    if not raw.isdigit():
+                        self.notifier.log(
+                            f"{match_time} ⚠️ 警告：KT Price 不是合法數字 → 忽略單一停利模式",
+                            Fore.YELLOW + Style.BRIGHT,
+                        )
+                        return
+                    p = int(raw)
                     if price >= p:
                         # BUG 修正：原本少傳 match_time，會造成 TypeError
-                        self._exit_takeprofit_all("多", price, match_time,str(p))
+                        self._exit_takeprofit_all(
+                            "多", price, match_time, str(p))
                     # elif price >= p2:
                     #     # BUG 修正：原本少傳 match_time，會造成 TypeError
                     #     self._exit_takeprofit_all("多", price, match_time,"profit_2")
@@ -471,7 +502,8 @@ class OrderManager:
                         )
                     elif price >= p3:
                         # BUG 修正：原本少傳 match_time，會造成 TypeError
-                        self._exit_takeprofit_all("多", price, match_time,"profit_3")
+                        self._exit_takeprofit_all(
+                            "多", price, match_time, "profit_3")
 
     def check_stoploss_triggered(self, price: int, match_time: str) -> None:
         """
@@ -501,16 +533,14 @@ class OrderManager:
                         qty = int(val) if val.isdigit() else 0
                         if qty > 0:
                             # 檢查 GUI 上「是否允許自動下單」
-                            self.frame.OnOrderBtn(
-                                event=None,
-                                S_Buys="B",   # 買回平倉
-                                price=price,
-                                offset="1",   # 1 = 平倉
+                            self._safe_order(
+                            side=str("B"),
+                            price=str(price),
+                            offset=str("1"),
                             )
                             self.frame.qtyLabel.SetLabel("未連")
                 except Exception:  # noqa: BLE001
                     self.notifier.error("⚠️ 放空止損平倉下單失敗，請檢查 OnOrderBtn。")
-
 
         # ---- 作多止損 ----
         if getattr(self, "trading_buy", False) and getattr(self, "stopLoss_buy", 0):
@@ -525,18 +555,17 @@ class OrderManager:
                         qty = int(val) if val.isdigit() else 0
                         if qty > 0:
                             # 檢查 GUI 上「是否允許自動下單」
-                            self.frame.OnOrderBtn(
-                                event=None,
-                                S_Buys="S",   # 賣出平倉
-                                price=price,
-                                offset="1",
+                            self._safe_order(
+                            side=str("S"),
+                            price=str(price),
+                            offset=str("1"),
                             )
                             self.frame.qtyLabel.SetLabel("未連")
                 except Exception:  # noqa: BLE001
                     self.notifier.error("⚠️ 多單止損平倉下單失敗，請檢查 OnOrderBtn。")
 
-
     # ========= 自動收盤平倉 =========
+
     def start_auto_liquidation(self) -> None:
         """
         啟動「自動收盤平倉」監控（背景執行緒）。
@@ -641,14 +670,12 @@ class OrderManager:
                     qty = int(val) if val.isdigit() else 0
                     if qty > 0:
                         # 呼叫原生下單介面
-                        self.frame.OnOrderBtn(
-                            event=None,
-                            S_Buys=side,
-                            price=price,
-                            offset=offset,
-                        )
+                        self._safe_order(
+                        side=str(side),
+                        price=str(price),
+                        offset=str(offset),
+                          )
                         self.frame.qtyLabel.SetLabel("未連")
-
 
                     msg_done = f"{now.strftime('%H:%M:%S')} ✅ 自動平倉成功：{direction}單"
                     self.notifier.log(msg_done, Fore.GREEN + Style.BRIGHT)

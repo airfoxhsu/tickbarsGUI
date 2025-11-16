@@ -178,8 +178,8 @@ class TradingStrategy:
         # self.stop_profit_chkBuy_str: str = "0"   # 目前多單使用的 停利 字串
         # self.stop_profit_chkSell_str: str = "0"  # 目前空單使用的 停利 字串
 
-        # 啟動程式時清理一次，保留 3 天
-        cleanup_yuanta_logs(".", keep_days=3)
+        # 啟動程式時清理一次，保留 1 天
+        cleanup_yuanta_logs(".", keep_days=1)
         # 清理 Logs/<日期>/ 底下的所有檔案，但保留今天和所有 event.log。
         clean_logs_except_today()
 
