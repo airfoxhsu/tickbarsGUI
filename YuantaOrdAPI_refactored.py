@@ -1048,7 +1048,8 @@ class AppFrame(wx.Frame):
         # self.Username = config["username"]
         # self.Password = config["password"]
         # self.Host = "203.66.93.84"
-        self.Port = 443 if self.is_day() else 442
+        self.Port = 443 if self.is_day() else 442        
+        self.rbAm.SetValue(True) if self.Port == 443 else self.rbPm.SetValue(True)
         LogonQuoteJob(Job.LOGONQUOTE, self.Username,
                       self.Password, self.Host, self.Port)
         # time.sleep(1)
