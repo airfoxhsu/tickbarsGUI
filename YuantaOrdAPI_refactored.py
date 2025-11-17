@@ -1544,58 +1544,9 @@ class StockBot:
             self.Yuanta.YuantaOrd.SetWaitOrdResult(1)
         else:
             self.Yuanta.YuantaOrd.SetWaitOrdResult(0)
-
-        ## 停利##
-        # if frame.chkProfit.GetValue() == True:
-        #     frame.Logmessage("RfSendOrder() {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-        #         frame.fcode_combo.GetString(
-        #             frame.fcode_combo.GetSelection())[0:2],
-        #         frame.ctype_rfcombo.GetString(
-        #             frame.ctype_rfcombo.GetSelection())[0:1],
-        #         bhon,
-        #         account,
-        #         ae_no,
-        #         frame.ordno.GetValue(),
-        #         frame.bscode1_combo.GetString(
-        #             frame.bscode1_combo.GetSelection())[0:1],
-        #         frame.futno1_combo.GetString(
-        #             frame.futno1_combo.GetSelection())[0:5],
-        #         frame.pritype_rfcombo.GetString(
-        #             frame.pritype_rfcombo.GetSelection())[0:1],
-        #         frame.price.GetValue(),
-        #         frame.ktprice.GetValue(),
-        #         frame.lots_combo.GetString(
-        #             frame.lots_combo.GetSelection())[0:1],
-        #         frame.offset_combo.GetString(frame.offset_combo.GetSelection())[0:1]))
-
-        #     ret_no = self.Yuanta.YuantaOrd.RfSendOrder(frame.fcode_combo.GetString(frame.fcode_combo.GetSelection())[0:2],
-        #                                                frame.ctype_rfcombo.GetString(
-        #                                                    frame.ctype_rfcombo.GetSelection())[0:1],
-        #                                                bhon,
-        #                                                account,
-        #                                                ae_no,
-        #                                                frame.ordno.GetValue(),
-        #                                                frame.bscode1_combo.GetString(
-        #                                                    frame.bscode1_combo.GetSelection())[0:1],
-        #                                                frame.futno1_combo.GetString(
-        #                                                    frame.futno1_combo.GetSelection())[0:5],
-        #                                                frame.pritype_rfcombo.GetString(
-        #                                                    frame.pritype_rfcombo.GetSelection())[0:1],
-        #                                                frame.price.GetValue(),
-        #                                                frame.ktprice.GetValue(),
-        #                                                frame.lots_combo.GetString(
-        #                                                    frame.lots_combo.GetSelection())[0:1],
-        #                                                frame.offset_combo.GetString(frame.offset_combo.GetSelection())[0:1])
-
-        #     frame.Logmessage("RfSendOrder() return = {}".format(ret_no))
-
-        # else:
-        # if frame.futno2.GetValue().strip() == '':
-        #     bs2 = ''
-        # else:
-        #     bs2 = frame.bscode2_combo.GetString(
-        #         frame.bscode2_combo.GetSelection())[0:1]
-        frame.Logmessage("SendOrderF() {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+      
+        frame.Logmessage("{}  SendOrderF() {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
+            datetime.datetime.now().strftime('%H:%M:%S'),
             frame.fcode_combo.GetString(
                 frame.fcode_combo.GetSelection())[0:2],
             frame.ctype_combo.GetString(
@@ -1624,14 +1575,6 @@ class StockBot:
             #     frame.bscode2_combo.GetSelection())[0:1],
             '',
             ''))
-        # frame.futno2.GetValue()))
-
-        # if frame.futno2.GetValue().strip() == '':
-        #     bs2 = ''
-        # else:
-        #     bs2 = frame.bscode2_combo.GetString(
-        #         frame.bscode2_combo.GetSelection())[0:1]
-
         ret_no = self.Yuanta.YuantaOrd.SendOrderF(frame.fcode_combo.GetString(frame.fcode_combo.GetSelection())[0:2],
                                                   frame.ctype_combo.GetString(
             frame.ctype_combo.GetSelection())[0:1],
@@ -1659,7 +1602,7 @@ class StockBot:
             # frame.futno2.GetValue().strip())
             '',
             '')
-        frame.Logmessage("SendOrderF() return = {}".format(ret_no))
+        frame.Logmessage(f"{datetime.datetime.now().strftime('%H:%M:%S')}  SendOrderF() return = {ret_no}")
 
     def send_ordQuery(self, bhon, account, ae_no):
         # if frame.chkProfit.GetValue() == True:  # 查國外
@@ -1710,40 +1653,118 @@ class YuantaOrdEvents(object):
             #     frame.isAutoPosition.SetValue(True)
             #     frame.OnAutoPositionCheck(None)
             frame.OnUserDefineBtn(event=None, method="庫存")
+
     # 手動委託回報查詢
-
     def OnReportQuery(self, this, RowCount, Results):
-        frame.OrdQueryRpt.Clear()
-        datas = Results.split('|')
-        for i in range(0, RowCount):
-            data = ''
-            for j in range(0, int(len(datas) / RowCount)):
-                data += datas[i * (int(len(datas) / RowCount)) + j]
-                if j < int(len(datas) / RowCount) - 1:
-                    data += ','
-                else:
-                    frame.OrdQueryRpt.Append(data)
-        item_count = frame.OrdQueryRpt.GetCount()
-        if item_count > 0:
-            frame.OrdQueryRpt.EnsureVisible(frame.OrdQueryRpt.GetCount()-1)
-    # 手動成交回報查詢
+        """
+        將 Yuanta 回報 Results 拆成 RowCount 筆，
+        每筆以 '|' 分割、以 '=' 拆成 key/value，
+        最終整理成 row_dict，並依 O_TIME 升冪排序。
+        """
 
+        frame.OrdQueryRpt.Clear()
+
+        raw_fields = Results.split('|')
+        fields = [f.strip() for f in raw_fields if f.strip()]
+
+        total = len(fields)
+
+        if RowCount <= 0 or total % RowCount != 0:
+            frame.OrdQueryRpt.Append(f"RowCount={RowCount} 或欄位數不符，資料無法解析")
+            return
+
+        columns = total // RowCount
+
+        all_rows = []
+
+        # 1. 拆成每筆資料
+        for row_idx in range(RowCount):
+            start = row_idx * columns
+            end = start + columns
+
+            row_items = fields[start:end]
+            row_dict = {}
+
+            for item in row_items:
+                if "=" not in item:
+                    continue
+                key, value = item.split("=", 1)
+                row_dict[key.strip()] = value.strip()
+
+            all_rows.append(row_dict)
+
+        # 2. 依 O_TIME 排序 (由小到大)
+        sorted_rows = sorted(
+            all_rows,
+            key=lambda x: x.get('O_TIME', '000000')  # 避免 O_TIME 缺失
+        )
+
+        # 3. 顯示排序後結果
+        for row in sorted_rows:
+            msg = (
+                f"{row.get('O_TIME', '')}  手查  {row.get('TS_MSG', '')}  {row.get('SYMB', '')}  "
+                f"{row.get('O_KIND', '')}  {row.get('BUYS', '')}  {row.get('S_BUYS', '')}  "
+                f"{row.get('O_QYT', '')}  {row.get('O_PRC', '')}  {row.get('ORDER_NO', '')}  "
+                f"{row.get('ERR_MSG', '')}"
+            )
+            frame.OrdQueryRpt.Append(msg)
+
+    # 手動成交回報查詢
     def OnDealQuery(self, this, RowCount, Results):
         frame.MatQueryRpt.Clear()
-        datas = Results.split('|')
-        for i in range(0, RowCount):
-            data = ''
-            for j in range(0, int(len(datas) / RowCount)):
-                data += datas[i * (int(len(datas) / RowCount)) + j]
-                if j < int(len(datas) / RowCount) - 1:
-                    data += ','
-                else:
-                    frame.MatQueryRpt.Append(data)
-        item_count = frame.MatQueryRpt.GetCount()
-        if item_count > 0:
-            frame.MatQueryRpt.EnsureVisible(frame.MatQueryRpt.GetCount()-1)
-    # 通用查詢 Event
+        """
+        將 Yuanta 回報 Results 拆成 RowCount 筆，
+        每筆以 '|' 分割、以 '=' 拆成 key/value，
+        最終整理成 row_dict，並依 O_TIME 升冪排序。
+        """
 
+        frame.MatQueryRpt.Clear()
+
+        raw_fields = Results.split('|')
+        fields = [f.strip() for f in raw_fields if f.strip()]
+
+        total = len(fields)
+
+        if RowCount <= 0 or total % RowCount != 0:
+            frame.MatQueryRpt.Append(f"RowCount={RowCount} 或欄位數不符，資料無法解析")
+            return
+
+        columns = total // RowCount
+
+        all_rows = []
+
+        # 1. 拆成每筆資料
+        for row_idx in range(RowCount):
+            start = row_idx * columns
+            end = start + columns
+
+            row_items = fields[start:end]
+            row_dict = {}
+
+            for item in row_items:
+                if "=" not in item:
+                    continue
+                key, value = item.split("=", 1)
+                row_dict[key.strip()] = value.strip()
+
+            all_rows.append(row_dict)
+
+        # 2. 依 O_TIME 排序 (由小到大)
+        sorted_rows = sorted(
+            all_rows,
+            key=lambda x: x.get('D_TIME', '000000')  # 避免 O_TIME 缺失
+        )
+
+        # 3. 顯示排序後結果
+        for row in sorted_rows:
+            msg = (
+                f"{row.get('D_TIME', '')}  手查  {row.get('SYMB', '')}  "
+                f"{row.get('O_KIND', '')}  {row.get('BUYS', '')}  {row.get('S_BUYS', '')}  "
+                f"{row.get('O_QTY', '')}  {row.get('A_PRC', '')}  {row.get('ORDER_NO', '')}  "
+            )
+            frame.MatQueryRpt.Append(msg)
+
+    # 通用查詢 Event
     def OnUserDefinsFuncResult(self, this, RowCount, Results, WorkID):
         try:
             # data = dict(p.split("=") for p in Results.split("|"))
@@ -1780,20 +1801,17 @@ class YuantaOrdEvents(object):
                   Deal_Qty, Order_No, T_Date, O_Date, O_Time,
                   O_Src, O_Lin, A_Prc, Oseq_No, Err_Code,
                   Err_Msg, R_Time, D_Flag):
-        # 檢查庫存
-        # frame.OnUserDefineBtn(event=None, method="庫存")
-        # 檢查庫存  手動呼叫事件函式
-        # frame.isAutoPosition.SetValue(True)
-        # frame.OnAutoPositionCheck(None)
-
-        msg = 'Omkt={},Mktt={},Cmbf={},Statusc={},Ts_Code={},Ts_Msg={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},O_Type={},Buys={},S_Buys={},O_Prc={},O_Qty={},Work_Qty={},Kill_Qty={},Deal_Qty={},Order_No={},T_Date={},O_Date={},O_Time={},O_Src={},O_Lin={},A_Prc={},Oseq_No={},Err_Code={},Err_Msg={},R_Time={},D_Flag={}'.format(Omkt.strip(), Mktt.strip(), Cmbf.strip(), Statusc.strip(), Ts_Code.strip(), Ts_Msg.strip(
-        ), Bhno.strip(), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), O_Type.strip(), Buys.strip(), S_Buys.strip(), O_Prc.strip(), O_Qty.strip(), Work_Qty.strip(), Kill_Qty.strip(), Deal_Qty.strip(), Order_No.strip(), T_Date.strip(), O_Date.strip(), O_Time.strip(), O_Src.strip(), O_Lin.strip(), A_Prc.strip(), Oseq_No.strip(), Err_Code.strip(), Err_Msg.strip(), R_Time.strip(), D_Flag.strip())
+        
+        # msg = 'Omkt={},Mktt={},Cmbf={},Statusc={},Ts_Code={},Ts_Msg={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},O_Type={},Buys={},S_Buys={},O_Prc={},O_Qty={},Work_Qty={},Kill_Qty={},Deal_Qty={},Order_No={},T_Date={},O_Date={},O_Time={},O_Src={},O_Lin={},A_Prc={},Oseq_No={},Err_Code={},Err_Msg={},R_Time={},D_Flag={}'.format(Omkt.strip(), Mktt.strip(), Cmbf.strip(), Statusc.strip(), Ts_Code.strip(), Ts_Msg.strip(
+        # ), Bhno.strip(), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), O_Type.strip(), Buys.strip(), S_Buys.strip(), O_Prc.strip(), O_Qty.strip(), Work_Qty.strip(), Kill_Qty.strip(), Deal_Qty.strip(), Order_No.strip(), T_Date.strip(), O_Date.strip(), O_Time.strip(), O_Src.strip(), O_Lin.strip(), A_Prc.strip(), Oseq_No.strip(), Err_Code.strip(), Err_Msg.strip(), R_Time.strip(), D_Flag.strip())
+        
+        msg = f"{O_Time.strip()}  自查  {Ts_Msg.strip()}  {Symb.strip()}  {O_Kind.strip()}  {Buys.strip()}  {S_Buys.strip()}  {O_Qty.strip()}  {O_Prc.strip()}  {Order_No.strip()}  {Err_Msg.strip()}"
         frame.OrdQueryRpt.Append(msg)
         item_count = frame.OrdQueryRpt.GetCount()
         if item_count > 0:
             frame.OrdQueryRpt.EnsureVisible(frame.OrdQueryRpt.GetCount()-1)
-    # 自動成交回報 Event
 
+    # 自動成交回報 Event
     def OnOrdMatF(self, this, Omkt, Buys, Cmbf, Bhno,
                   AcNo, Suba, Symb, Scnam, O_Kind,
                   S_Buys, O_Prc, A_Prc, O_Qty, Deal_Qty,
@@ -1806,8 +1824,10 @@ class YuantaOrdEvents(object):
             frame.isAutoPosition.SetValue(True)
             frame.OnAutoPositionCheck(None)
 
-        msg = 'Omkt={},Buys={},Cmbf={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},S_Buys={},O_Prc={},A_Prc={},O_Qty={},Deal_Qty={},T_Date={},D_Time={},Order_No={},O_Src={},O_Lin={},Oseq_No={}'.format(Omkt.strip(), Buys.strip(), Cmbf.strip(), Bhno.strip(
-        ), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), S_Buys.strip(), O_Prc.strip(), A_Prc.strip(), O_Qty.strip(), Deal_Qty.strip(), T_Date.strip(), D_Time.strip(), Order_No.strip(), O_Src.strip(), O_Lin.strip(), Oseq_No.strip())
+        # msg = 'Omkt={},Buys={},Cmbf={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},S_Buys={},O_Prc={},A_Prc={},O_Qty={},Deal_Qty={},T_Date={},D_Time={},Order_No={},O_Src={},O_Lin={},Oseq_No={}'.format(Omkt.strip(), Buys.strip(), Cmbf.strip(), Bhno.strip(
+        # ), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), S_Buys.strip(), O_Prc.strip(), A_Prc.strip(), O_Qty.strip(), Deal_Qty.strip(), T_Date.strip(), D_Time.strip(), Order_No.strip(), O_Src.strip(), O_Lin.strip(), Oseq_No.strip())
+        msg = f"{D_Time.strip()}  自查  {Symb.strip()}  {O_Kind.strip()}  {Buys.strip()}  {S_Buys.strip()}  {O_Qty.strip()}  {O_Prc.strip()}  {Order_No.strip()}"
+
         frame.MatQueryRpt.Append(msg)
         item_count = frame.MatQueryRpt.GetCount()
         if item_count > 0:
@@ -1815,7 +1835,7 @@ class YuantaOrdEvents(object):
     # 委託結果 當委託後產生Event
 
     def OnOrdResult(self, this, ID, result):
-        msg = 'OnOrdResult:ID={},result={}'.format(ID, result)
+        msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  OnOrdResult:ID={ID},result={result}"
         frame.Logmessage(msg)
 
     def OnRfOrdRptRF(self, this, exc, Omkt, Statusc, Ts_Code,
