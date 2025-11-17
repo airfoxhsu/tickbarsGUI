@@ -141,7 +141,8 @@ class OrderManager:
             # 記錄多單的三段停利價位
             self.profit_buy_str = f"{p1}:{p2}:{p3}"
             # 使用第 4 段 Fibonacci 作為「主訊號價」顯示（呼叫者既有邏輯）
-            label = f"進場多: {levels[3] if len(levels) > 3 else entry_price}"
+            # label = f"進場多: {levels[3] if len(levels) > 3 else entry_price}"
+            label = f"進場多: {self.entry_price_buy}"
             if self.frame.chkBuy.IsChecked() and fibonacci_str and levels:
                 self.ui.set_price_combo_items(levels, profits)
         else:
@@ -151,7 +152,8 @@ class OrderManager:
             self.entry_price_sell = trigger_price
             self.stopLoss_sell = stop_loss
             self.profit_sell_str = f"{p1}:{p2}:{p3}"
-            label = f"進場空: {levels[3] if len(levels) > 3 else entry_price}"
+            # label = f"進場空: {levels[3] if len(levels) > 3 else entry_price}"
+            label = f"進場空: {self.entry_price_sell}"
             if self.frame.chkSell.IsChecked() and fibonacci_str and levels:
                 self.ui.set_price_combo_items(levels, profits)
 
