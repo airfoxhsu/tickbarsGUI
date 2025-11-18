@@ -176,6 +176,7 @@ class OrderManager:
 
         # === 發出訊號通知 ===
         # 簡短版訊息（給 Telegram）
+        level_text = self.entry_price_buy if direction == '多' else self.entry_price_sell
         # if len(levels) > 3:
         #     level_text = levels[3]
         # else:
@@ -183,7 +184,7 @@ class OrderManager:
 
         msg_sms = (
             f"{match_time}  "
-            f"{'作多訊號' if direction == '多' else '放空訊號'}: {self.entry_price_buy}  "
+            f"{'作多訊號' if direction == '多' else '放空訊號'}: {level_text}  "
             f"止損: {stop_loss}  停利: {p1}"
         )
         # 詳細版訊息（包含完整 Fibonacci & 三段停利）
