@@ -1030,13 +1030,14 @@ class AppFrame(wx.Frame):
         while True:
             if self.is_day() and not self.is_day_port():
                 self.Port = 443
-                # msg = "Change connection port to 443."
+                self.rbAm.SetValue(True)
                 msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  切換日盤port to 443並初始化數據."
                 ts.__init__(frame)
                 self.Logmessage(msg)
                 self.ConnectionQuote(None)
             elif not self.is_day() and self.is_day_port():
                 self.Port = 442
+                self.rbPm.SetValue(True)
                 msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  切換夜盤port to 442並初始化數據."
                 ts.__init__(frame)
                 self.Logmessage(msg)
@@ -1065,8 +1066,8 @@ class AppFrame(wx.Frame):
     # 判斷是否為日盤時間
     def is_day(self):
         """
-        07:00~14:45 - Day
-        14:45~07:00 - Night
+        07:50~14:50 - Day
+        14:50~07:50 - Night
         """
         now = self.get_time()
         # now = datetime.datetime.now()
