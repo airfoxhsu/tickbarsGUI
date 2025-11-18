@@ -87,6 +87,13 @@ class TradingStrategy:
             - `monitorTradeSignal`：顯示終端訊息的 TextCtrl。
             - `compareInfoGrid` / `avgPrice` 等，用來顯示各種數據。
         """
+        # 停掉舊的 OrderManager thread
+        try:
+            if hasattr(self, "order") and self.order:
+                self.order.stop_all_threads()
+        except:
+            pass
+
         # ===== 連結 GUI 與輸出 =====
         self.frame = frame  # 主視窗參考，用來存取所有 GUI 控制項
 
@@ -1097,7 +1104,21 @@ class TradingStrategy:
         #         f"停利: {self.order.profit_buy_str}{Style.RESET_ALL}"
         #     )
 
+def load_json(fpath: str) -> dict:
+    """安全載入 JSON 設定檔。
 
-def load_json(fpath):
-    with open(fpath, "r", encoding="UTF-8") as f:
-        return json.load(f)
+    讀不到檔案或格式錯誤時，回傳空 dict，避免整個策略在啟動階段直接 crash。
+    """
+    try:
+        with open(fpath, "r", encoding="UTF-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"⚠️ 找不到設定檔 {fpath}，將使用預設參數啟動。")
+        return {}
+    except json.JSONDecodeError:
+        print(f"⚠️ 設定檔 {fpath} 內容不是合法 JSON，將使用預設參數啟動。")
+        return {}
+    except Exception as e:  # noqa: BLE001
+        print(f"⚠️ 載入設定檔 {fpath} 發生未預期錯誤: {e}，將使用預設參數啟動。")
+        return {}
+

@@ -71,6 +71,13 @@ class OrderManager:
         self.buy_signal: bool = False    # 是否目前有「多單進場訊號」
         self.sell_signal: bool = False   # 是否目前有「空單進場訊號」
 
+        #給start_auto_liquidation加一個停止旗標    
+        self._auto_thread_stop = threading.Event()
+        self._auto_thread = None
+
+        self.forbidden_warned = False   # 禁止時段是否警告過
+
+
     def _safe_order(self, side, price, offset):
         """安全封裝，確保所有傳入 OnOrderBtn 的參數都是字串。"""
         try:
@@ -169,14 +176,14 @@ class OrderManager:
 
         # === 發出訊號通知 ===
         # 簡短版訊息（給 Telegram）
-        if len(levels) > 3:
-            level_text = levels[3]
-        else:
-            level_text = str(entry_price)
+        # if len(levels) > 3:
+        #     level_text = levels[3]
+        # else:
+        #     level_text = str(entry_price)
 
         msg_sms = (
             f"{match_time}  "
-            f"{'作多訊號' if direction == '多' else '放空訊號'}: {level_text}  "
+            f"{'作多訊號' if direction == '多' else '放空訊號'}: {self.entry_price_buy}  "
             f"止損: {stop_loss}  停利: {p1}"
         )
         # 詳細版訊息（包含完整 Fibonacci & 三段停利）
@@ -221,6 +228,14 @@ class OrderManager:
         4. 若允許，呼叫 frame.OnOrderBtn 實際送單
         5. 送單後標記 trading_buy/trading_sell = True
         """
+        # === 禁止時段濾網 ===
+        if self._is_forbidden_time(match_time):
+            if not self.forbidden_warned:  
+                self.notifier.warn(f"{match_time} 禁止時段，不執行真實下單。")
+                self.forbidden_warned = True
+            return
+
+    
         # === 防重複開倉 ===
         if direction == "多" and self.trading_buy:
             self.notifier.log("⚠️ 已有多單，不重複開倉。", Fore.YELLOW)
@@ -298,6 +313,7 @@ class OrderManager:
             self.trading_buy = False
             self.buy_signal = False
             self.profit_buy_str = ""
+            self.entry_price_buy = 0
         else:
             row = 0
             text = "放空止損"
@@ -305,6 +321,7 @@ class OrderManager:
             self.trading_sell = False
             self.sell_signal = False
             self.profit_sell_str = ""
+            self.entry_price_sell = 0
 
         # === 真正執行平倉委託 ===
         try:
@@ -324,7 +341,8 @@ class OrderManager:
 
         except Exception:  # noqa: BLE001
             self.notifier.error("止損平倉下單失敗，請檢查 OnOrderBtn 或價位設定。")
-
+        # 重置旗標，下次會再印一次
+        self.forbidden_warned = False
         msg = f"{match_time}  {text}: {int(price)}  平倉不悔"
         self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
         self.notifier.send_telegram_if_enabled(msg)
@@ -382,10 +400,15 @@ class OrderManager:
             self.trading_buy = False
             self.buy_signal = False
             self.profit_buy_str = ""
+            self.entry_price_buy = 0
         else:
             self.trading_sell = False
             self.sell_signal = False
             self.profit_sell_str = ""
+            self.entry_price_sell = 0
+            
+        # 重置旗標，下次會再印一次
+        self.forbidden_warned = False
 
     # ========= 移動停利 =========
     def update_trailing_profit(self, current_price: float, match_time: str) -> None:
@@ -577,8 +600,19 @@ class OrderManager:
         - 每 30 秒檢查一次現在時間是否為「收盤前幾分鐘」
         - 若時間符合且仍有持倉，則呼叫 :meth:`_force_liquidation` 強制平倉。
         """
-        t = threading.Thread(target=self._auto_liquidation_loop, daemon=True)
-        t.start()
+        # 若舊 thread 還在，先停掉
+        if self._auto_thread and self._auto_thread.is_alive():
+            self._auto_thread_stop.set()
+            self._auto_thread.join(timeout=1)
+
+        self._auto_thread_stop.clear()
+        self._auto_thread = threading.Thread(
+            target=self._auto_liquidation_loop,
+            daemon=True
+        )
+        self._auto_thread.start()
+        # t = threading.Thread(target=self._auto_liquidation_loop, daemon=True)
+        # t.start()
         self.notifier.log("✅ 自動收盤平倉監控已啟動", Fore.CYAN + Style.BRIGHT)
 
     def _auto_liquidation_loop(self) -> None:
@@ -589,7 +623,7 @@ class OrderManager:
         - 取得目前時間（HH:MM）
         - 若時間為 close_times 之一，則呼叫 :meth:`_force_liquidation`。
         """
-        while True:
+        while not self._auto_thread_stop.is_set():
             try:
                 now = datetime.datetime.now()
                 current = now.strftime("%H:%M")
@@ -600,12 +634,16 @@ class OrderManager:
                 if current in close_times:
                     self._force_liquidation(now)
 
-                time.sleep(30)
+                # 每次 sleep 時也要能被停止
+                for _ in range(30):
+                    if self._auto_thread_stop.is_set():
+                        break
+                    time.sleep(1)
 
             except Exception as e:  # noqa: BLE001
                 # 使用 print 是為了在 notifier 發生問題時仍能看到錯誤訊息
                 print(f"自動平倉監控錯誤: {e}")
-                time.sleep(30)
+                time.sleep(1)
 
     def _force_liquidation(self, now: datetime.datetime) -> None:
         """
@@ -695,3 +733,31 @@ class OrderManager:
 
         except Exception as e:  # noqa: BLE001
             self.notifier.error(f"⚠️ 自動收盤平倉失敗: {e}")
+
+    def stop_all_threads(self):
+        # 停止自動收盤平倉 thread
+        if self._auto_thread and self._auto_thread.is_alive():
+            self._auto_thread_stop.set()
+            self._auto_thread.join(timeout=1)
+
+    def _is_forbidden_time(self, match_time: str) -> bool:
+        """判斷是否為禁止進場時間區段。match_time 格式預期為 HH:MM:SS"""
+
+        try:
+            hh = int(match_time[:2])
+            mm = int(match_time[3:5])
+        except:
+            return False  # 若時間格式怪怪的，先不阻擋以避免誤殺
+
+        # 13:00 ~ 13:45 禁止
+        if hh == 13 and 0 <= mm <= 45:
+            return True
+
+        # 04:00 ~ 05:00 禁止
+        if hh == 4:
+            return True
+        if hh == 5 and mm == 0:
+            return True
+
+        return False
+
