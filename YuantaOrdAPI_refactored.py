@@ -11,9 +11,8 @@ from comtypes import IUnknown, GUID
 from comtypes.client import GetModule,  GetBestInterface, GetEvents
 import queue as queue
 import json
-import datetime
-import dateutil.relativedelta
-# import trading_strategy_calc
+from datetime import datetime, timedelta, timezone
+from dateutil.relativedelta import relativedelta
 from trading_strategy import TradingStrategy
 from colorama import Fore, Back, Style, init
 from functools import partial
@@ -1031,14 +1030,14 @@ class AppFrame(wx.Frame):
             if self.is_day() and not self.is_day_port():
                 self.Port = 443
                 self.rbAm.SetValue(True)
-                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  切換日盤port to 443並初始化數據."
+                msg = f"{datetime.now().strftime('%H:%M:%S')}  切換日盤port to 443並初始化數據."
                 ts.__init__(frame)
                 self.Logmessage(msg)
                 self.ConnectionQuote(None)
             elif not self.is_day() and self.is_day_port():
                 self.Port = 442
                 self.rbPm.SetValue(True)
-                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  切換夜盤port to 442並初始化數據."
+                msg = f"{datetime.now().strftime('%H:%M:%S')}  切換夜盤port to 442並初始化數據."
                 ts.__init__(frame)
                 self.Logmessage(msg)
                 self.ConnectionQuote(None)
@@ -1069,8 +1068,8 @@ class AppFrame(wx.Frame):
         07:50~14:50 - Day
         14:50~07:50 - Night
         """
-        now = self.get_time()
-        # now = datetime.datetime.now()
+        # now = self.get_time()
+        now = datetime.now(timezone(timedelta(hours=8)))
         day_begin = now.replace(hour=7, minute=50, second=0)
         day_end = now.replace(hour=14, minute=50, second=0)
 
@@ -1086,7 +1085,8 @@ class AppFrame(wx.Frame):
         08:45~13:45 - Day
         15:00~05:00 - Night
         """
-        now = self.get_time()
+        # now = self.get_time()
+        now = datetime.now(timezone(timedelta(hours=8)))
         day_begin = now.replace(hour=8, minute=45, second=0)
         day_end = now.replace(hour=13, minute=45, second=0)
         night_begin = now.replace(hour=15, minute=00, second=0)
@@ -1101,13 +1101,13 @@ class AppFrame(wx.Frame):
 
         return False
 
-    def get_time(self):
-        """Get the absolute time of UTC+8.「中原標準時間」"""
-        d = datetime.timedelta(hours=8)
-        t = datetime.datetime.utcnow()
-        # t = datetime.datetime.now()
-        t += d
-        return t
+    # def get_time(self):
+    #     """Get the absolute time of UTC+8.「中原標準時間」"""
+    #     d = timedelta(hours=8)
+    #     t = datetime.utcnow()
+    #     # t = datetime.datetime.now()
+    #     t += d
+    #     return t
 
     # 計算選擇權商品代碼
     def get_month_code(self):
@@ -1116,21 +1116,27 @@ class AppFrame(wx.Frame):
         # day = datetime.date.today().replace(day=1)
         """計算期貨商品代碼（本月第三個星期三 14:00 後 → 切換到下個月合約）"""
         # 現在時間（含時分秒）
-        now = datetime.datetime.now()
+        now = datetime.now(timezone(timedelta(hours=8)))
         # 本月 1 號的 datetime
         day = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         # 找到本月第一個星期三（weekday=2）
         while day.weekday() != 2:
-            day = day + datetime.timedelta(days=1)
+            day = day + timedelta(days=1)
         # 第一個星期三 + 14 天 = 第三個星期三
-        day = day + dateutil.relativedelta.relativedelta(days=14)
+        third_wednesday  = day + relativedelta(days=14)
         # if day < today:
         #     day = day + dateutil.relativedelta.relativedelta(months=1)
         # 將時間設成 14:00
-        third_wed_14 = day.replace(hour=14, minute=0, second=0, microsecond=0)
+        third_wed_14 = third_wednesday .replace(hour=14, minute=0, second=0, microsecond=0)
         # 若現在時間 >= 第三個星期三 14:00 → 使用下個月合約
         if now >= third_wed_14:
-            third_wed_14 += dateutil.relativedelta(months=1)
+            next_month = (third_wednesday + relativedelta(months=1))
+            day = next_month.replace(day=1,
+                                    hour=0, minute=0, second=0, microsecond=0)
+        else:
+            # 否則仍然使用本月
+            day = third_wednesday.replace(day=1,
+                                        hour=0, minute=0, second=0, microsecond=0)
         # Month code mapping（依你的券商規則 A～L)
         codes = "ABCDEFGHIJKL"
         # 年份最後一碼
@@ -1163,7 +1169,7 @@ class AppFrame(wx.Frame):
         with open("code.json", "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
 
-        self.Logmessage(f"{datetime.datetime.now().strftime('%H:%M:%S')}  已產生並寫入 code.json：{data}")
+        self.Logmessage(f"{datetime.now().strftime('%H:%M:%S')}  已產生並寫入 code.json：{data}")
         return data
 
     # def XF(self, code):
@@ -1294,20 +1300,20 @@ class YuantaQuoteEvents(object):
         }
 
         if Status < 0:
-            msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  {link_status.get(Status)}: Try to login again."
+            msg = f"{datetime.now().strftime('%H:%M:%S')}  {link_status.get(Status)}: Try to login again."
             frame.Logmessage(msg)
             if frame.is_trade_time():
-                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  Reconnection in trade time will be wait for 1 second"
+                msg = f"{datetime.now().strftime('%H:%M:%S')}  Reconnection in trade time will be wait for 1 second"
                 if frame.waitMinuteToSMS:
                     frame.waitMinuteToSMS = False
-                    bot_message = f"{datetime.datetime.now().strftime('%H:%M:%S')}  網路中斷,目前在交易時間內請檢查連線狀況"
+                    bot_message = f"{datetime.now().strftime('%H:%M:%S')}  網路中斷,目前在交易時間內請檢查連線狀況"
                     threading.Thread(target=ts.telegram_bot_sendtext, args=(
                         bot_message,), daemon=True).start()
                     threading.Timer(60, frame.reset_waitMinuteToSMS).start()
                 frame.Logmessage(msg)
                 time.sleep(1)
             else:
-                msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  Reconnection beyond trade time will wait for 1 minutes"
+                msg = f"{datetime.now().strftime('%H:%M:%S')}  Reconnection beyond trade time will wait for 1 minutes"
                 frame.Logmessage(msg)
                 time.sleep(60)
             if Status == -1:
@@ -1339,7 +1345,7 @@ class YuantaQuoteEvents(object):
                 code, 2, ReqType, 0)
             msg = f"Registered {code}, result: {result}"
             frame.Logmessage(msg)
-        msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  Future registration done."
+        msg = f"{datetime.now().strftime('%H:%M:%S')}  Future registration done."
         frame.Logmessage(msg)
 
     def OnRegError(self, this, symbol, updmode, ErrCode, ReqType):
@@ -1493,7 +1499,7 @@ class StockBot:
     def logon_quote(self, Username, Password, Host, Port):
         # T port 80/443 , T+1 port 82/442 ,  reqType=1 T盤 , reqType=2  T+1盤
         reqType = "日盤" if Port == 443 or Port == 80 else "夜盤"
-        msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  連接報價行情主機  {Host}:{Port}  {reqType}"
+        msg = f"{datetime.now().strftime('%H:%M:%S')}  連接報價行情主機  {Host}:{Port}  {reqType}"
         frame.Logmessage(msg)
         self.YuantaQ.YuantaQuote.SetMktLogon(Username, Password,
                                              Host, Port, 1, 0)
@@ -1547,7 +1553,7 @@ class StockBot:
             self.Yuanta.YuantaOrd.SetWaitOrdResult(0)
       
         frame.Logmessage("{}  SendOrderF() {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}".format(
-            datetime.datetime.now().strftime('%H:%M:%S'),
+            datetime.now().strftime('%H:%M:%S'),
             frame.fcode_combo.GetString(
                 frame.fcode_combo.GetSelection())[0:2],
             frame.ctype_combo.GetString(
@@ -1603,7 +1609,7 @@ class StockBot:
             # frame.futno2.GetValue().strip())
             '',
             '')
-        frame.Logmessage(f"{datetime.datetime.now().strftime('%H:%M:%S')}  SendOrderF() return = {ret_no}")
+        frame.Logmessage(f"{datetime.now().strftime('%H:%M:%S')}  SendOrderF() return = {ret_no}")
 
     def send_ordQuery(self, bhon, account, ae_no):
         # if frame.chkProfit.GetValue() == True:  # 查國外
@@ -1836,7 +1842,7 @@ class YuantaOrdEvents(object):
     # 委託結果 當委託後產生Event
 
     def OnOrdResult(self, this, ID, result):
-        msg = f"{datetime.datetime.now().strftime('%H:%M:%S')}  OnOrdResult:ID={ID},result={result}"
+        msg = f"{datetime.now().strftime('%H:%M:%S')}  OnOrdResult:ID={ID},result={result}"
         frame.Logmessage(msg)
 
     def OnRfOrdRptRF(self, this, exc, Omkt, Statusc, Ts_Code,
@@ -2083,7 +2089,7 @@ def load_json(fpath):
 
 if __name__ == "__main__":
     APP_VERSION = "v1.1.1"
-    today = datetime.date.today().strftime("%Y-%m-%d")
+    today = datetime.now().strftime("%Y-%m-%d")
     app = MyApp()
     frame = AppFrame(None, title=f'千金交易系統  {APP_VERSION}  ({today})', size=(1260, 850))
     frame.SetPosition((10, 10))
