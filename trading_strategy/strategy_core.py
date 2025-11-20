@@ -532,7 +532,7 @@ class TradingStrategy:
 
         # ===== 放空：等反彈到預設放空價（含）以上 =====
         # sell_signal：代表之前 signal_trade 判斷過一次「有空點」，但尚未真正進場。
-        if getattr(self.order, "sell_signal", False) and not getattr(self.order, "trading_sell", False):
+        if getattr(self.order, "sell_signal", False) and not getattr(self.order, "trading_sell", False) and not getattr(self.order, "forbidden_warned", False):
             entry = int(getattr(self.order, "entry_price_sell", 0)
                         or 0)  # 預設放空價
             if entry > 0 and price > entry:
