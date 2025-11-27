@@ -4,3 +4,8 @@ logs/
 tickbarsGUI_venv/
 output/
 __pycache__/
+*.png
+*.xlsx
+*.zip
+*.csv
+summary.txt

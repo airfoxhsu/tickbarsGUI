@@ -1958,7 +1958,7 @@ class MyApp(wx.App):
 
             # 5️⃣ Idle 與節流 time.sleep(防止 CPU 滿載)
             try:
-                # time.sleep(0.001)
+                time.sleep(0.001)
                 # if wx.GetApp() and wx.GetApp().IsMainLoopRunning():
                 evtloop.ProcessIdle()
             except (wx._core.wxAssertionError, RuntimeError):
@@ -2088,7 +2088,7 @@ def load_json(fpath):
 
 
 if __name__ == "__main__":
-    APP_VERSION = "V1.1.2"
+    APP_VERSION = "0.001秒"
     today = datetime.now().strftime("%Y-%m-%d")
     app = MyApp()
     frame = AppFrame(None, title=f'千金交易系統  {APP_VERSION}  ({today})', size=(1260, 850))

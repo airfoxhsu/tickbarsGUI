@@ -184,6 +184,8 @@ class TradingStrategy:
         # 代表「當前多單 / 空單採用的那組 停利 價格」
         # self.stop_profit_chkBuy_str: str = "0"   # 目前多單使用的 停利 字串
         # self.stop_profit_chkSell_str: str = "0"  # 目前空單使用的 停利 字串
+        
+        self.frame.rbAm.SetValue(True) if self.frame.is_day() else self.frame.rbPm.SetValue(True)
 
         # 啟動程式時清理一次，保留 1 天
         cleanup_yuanta_logs(".", keep_days=1)

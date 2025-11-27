@@ -260,7 +260,7 @@ class AppFrame(wx.Frame):
         self.rbAm = wx.RadioButton(
             pnl, 1, label='日盤', pos=(870, 30), style=wx.RB_GROUP)
         self.rbPm = wx.RadioButton(pnl, 2, label='夜盤', pos=(915, 30))
-        self.rbAm.SetValue(True) if self.is_day() else self.rbPm.SetValue(True)
+        # self.rbAm.SetValue(True) if self.is_day() else self.rbPm.SetValue(True)
 
         logonQuote = wx.Button(pnl, wx.ID_ANY, label='登入',
                                pos=(1080, 22), size=(40, 30))
@@ -1029,14 +1029,14 @@ class AppFrame(wx.Frame):
         while True:
             if self.is_day() and not self.is_day_port():
                 self.Port = 443
-                self.rbAm.SetValue(True)
+                # self.rbAm.SetValue(True)
                 msg = f"{datetime.now().strftime('%H:%M:%S')}  切換日盤port to 443並初始化數據."
                 ts.__init__(frame)
                 self.Logmessage(msg)
                 self.ConnectionQuote(None)
             elif not self.is_day() and self.is_day_port():
                 self.Port = 442
-                self.rbPm.SetValue(True)
+                # self.rbPm.SetValue(True)
                 msg = f"{datetime.now().strftime('%H:%M:%S')}  切換夜盤port to 442並初始化數據."
                 ts.__init__(frame)
                 self.Logmessage(msg)
@@ -1048,10 +1048,10 @@ class AppFrame(wx.Frame):
         # self.Username = config["username"]
         # self.Password = config["password"]
         # self.Host = "203.66.93.84"
-        self.Port = 443 if self.is_day() else 442        
-        self.rbAm.SetValue(True) if self.Port == 443 else self.rbPm.SetValue(True)
+        self.Port = 443 if self.is_day() else 442  
         LogonQuoteJob(Job.LOGONQUOTE, self.Username,
-                      self.Password, self.Host, self.Port)
+                      self.Password, self.Host, self.Port)      
+        # self.rbAm.SetValue(True) if self.Port == 443 else self.rbPm.SetValue(True)
         # time.sleep(1)
     # 判斷是否為日盤連線埠
 
@@ -1833,7 +1833,7 @@ class YuantaOrdEvents(object):
 
         # msg = 'Omkt={},Buys={},Cmbf={},Bhno={},Acno={},Suba={},Symb={},Scnam={},O_Kind={},S_Buys={},O_Prc={},A_Prc={},O_Qty={},Deal_Qty={},T_Date={},D_Time={},Order_No={},O_Src={},O_Lin={},Oseq_No={}'.format(Omkt.strip(), Buys.strip(), Cmbf.strip(), Bhno.strip(
         # ), AcNo.strip(), Suba.strip(), Symb.strip(), Scnam.strip(), O_Kind.strip(), S_Buys.strip(), O_Prc.strip(), A_Prc.strip(), O_Qty.strip(), Deal_Qty.strip(), T_Date.strip(), D_Time.strip(), Order_No.strip(), O_Src.strip(), O_Lin.strip(), Oseq_No.strip())
-        msg = f"{D_Time.strip()}  自查  {Symb.strip()}  {O_Kind.strip()}  {Buys.strip()}  {S_Buys.strip()}  {O_Qty.strip()}  {O_Prc.strip()}  {Order_No.strip()}"
+        msg = f"{D_Time.strip()}  自查  {Symb.strip()}  {O_Kind.strip()}  {Buys.strip()}  {S_Buys.strip()}  {Deal_Qty.strip()}  {A_Prc.strip()}  {Order_No.strip()}"
 
         frame.MatQueryRpt.Append(msg)
         item_count = frame.MatQueryRpt.GetCount()

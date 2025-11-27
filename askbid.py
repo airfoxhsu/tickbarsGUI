@@ -1,6 +1,5 @@
 import os
 import re
-import zipfile
 from datetime import datetime, timedelta
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
@@ -20,6 +19,15 @@ class FuturesBatchProcessorGUI:
         self.day_end = (13,45)
         self.night_start = (15,0)
         self.night_end = (5,0)
+
+    def format_time(self, raw_time):
+        try:
+            s = str(raw_time)
+            if len(s) >= 6:
+                return f"{s[0:2]}:{s[2:4]}:{s[4:6]}"
+            return s
+        except:
+            return raw_time
 
     def parse_line(self, line):
         try:
@@ -114,9 +122,14 @@ class FuturesBatchProcessorGUI:
         dt = start_dt
         while dt <= end_dt:
             folder = os.path.join(root_dir, dt.strftime("%Y%m%d"))
+            print(f"檢查目錄: {folder}")
             if os.path.isdir(folder):
-                for fp in glob.glob(os.path.join(folder, "*.Log")):
+                found = glob.glob(os.path.join(folder, "Event.Log"))
+                print(f"  -> 找到 {len(found)} 個 Log 檔")
+                for fp in found:
                     files.append(fp)
+            else:
+                print("  -> 目錄不存在")
             dt += timedelta(days=1)
         if not files:
             raise ValueError("在指定日期區間未找到任何 .Log 檔")
@@ -128,11 +141,14 @@ class FuturesBatchProcessorGUI:
         all_ticks = []
         last_tqty = {}
         for fp in files:
+            # Extract date from folder name (parent directory of the log file)
+            file_date = os.path.basename(os.path.dirname(fp))
             with open(fp, 'r', encoding='utf-8', errors='ignore') as f:
                 for line in f:
                     parsed = self.parse_line(line)
                     if not parsed:
                         continue
+                    parsed['logdate'] = file_date
                     sym = parsed['symbol']
                     ct = parsed['tqty']
                     last = last_tqty.get(sym, -1)
@@ -160,6 +176,7 @@ class FuturesBatchProcessorGUI:
         position = 0
         entry_price = None
         entry_time = None
+        entry_date = None
         entry_day_high = None
         entry_day_low = None
         window_buffer = []
@@ -168,14 +185,71 @@ class FuturesBatchProcessorGUI:
         consec_loss = 0
         max_consec_loss = 0
         current_day_high = None
+        current_day_high = None
         current_day_low = None
+        current_print_date = None
 
         for idx, row in df.iterrows():
+            if row['logdate'] != current_print_date:
+                current_print_date = row['logdate']
+                print(f"\n========= {current_print_date} =========")
+
             curr_price = row['price']
             tick_high = row['high']
             tick_low = row['low']
             mattime = row['mattime']
             session = self.classify_session(mattime)
+
+            # Session-end forced closing (intraday trading) - look ahead to next tick
+            if position != 0 and session in ['day', 'night']:
+                session_end_reason = None
+                # Check if next tick exists and is in a different session
+                if idx + 1 < len(df):
+                    next_mattime = df.iloc[idx + 1]['mattime']
+                    next_session = self.classify_session(next_mattime)
+                    if next_session != session:
+                        # Current tick is last tick of this session
+                        if session == 'day':
+                            session_end_reason = 'session_end_day'
+                        elif session == 'night':
+                            session_end_reason = 'session_end_night'
+                
+                if session_end_reason:
+                    pnl_points = (curr_price - entry_price) * position
+                    exit_time = mattime
+                    holding_secs = None
+                    try:
+                        et = datetime.strptime(entry_time[:6], "%H%M%S")
+                        xt = datetime.strptime(mattime[:6], "%H%M%S")
+                        holding_secs = (xt - et).total_seconds()
+                        if holding_secs < 0:
+                            holding_secs += 24*3600
+                    except:
+                        holding_secs = None
+                    
+                    trades.append({
+                        'entry_time': entry_time, 'exit_time': exit_time,
+                        'entry_price': entry_price, 'exit_price': curr_price,
+                        'position': position, 'pnl_points': pnl_points,
+                        'holding_secs': holding_secs, 'exit_reason': session_end_reason,
+                        'session': session, 'index_when_exited': idx
+                    })
+                    print(f"[Trade] {entry_date} {self.format_time(entry_time)} @ {entry_price:.0f} ({'Long' if position==1 else 'Short'}) -> {row['logdate']} {self.format_time(mattime)} @ {curr_price:.0f} | PnL: {pnl_points:+.0f} | Reason: {session_end_reason}")
+                    equity_sum += pnl_points
+                    equity.append({'idx': idx, 'equity': equity_sum})
+                    if pnl_points < 0:
+                        consec_loss += 1
+                        if consec_loss > max_consec_loss:
+                            max_consec_loss = consec_loss
+                    else:
+                        consec_loss = 0
+                    
+                    position = 0
+                    entry_price = None
+                    entry_time = None
+                    entry_date = None
+                    entry_day_high = None
+                    entry_day_low = None
 
             if tick_high is not None:
                 current_day_high = tick_high if current_day_high is None else max(current_day_high, tick_high)
@@ -208,6 +282,7 @@ class FuturesBatchProcessorGUI:
                     'holding_secs': holding_secs, 'exit_reason': stop_reason,
                     'session': session, 'index_when_exited': idx
                 })
+                print(f"[Trade] {entry_date} {self.format_time(entry_time)} @ {entry_price:.0f} ({'Long' if position==1 else 'Short'}) -> {row['logdate']} {self.format_time(mattime)} @ {curr_price:.0f} | PnL: {pnl_points:+.0f} | Reason: {stop_reason}")
                 equity_sum += pnl_points
                 equity.append({'idx': idx, 'equity': equity_sum})
                 if pnl_points < 0:
@@ -228,6 +303,7 @@ class FuturesBatchProcessorGUI:
                     position = last_window_signal
                     entry_price = curr_price
                     entry_time = mattime
+                    entry_date = row['logdate']
                     entry_day_high = current_day_high
                     entry_day_low = current_day_low
                 continue
@@ -280,6 +356,7 @@ class FuturesBatchProcessorGUI:
                             'holding_secs': holding_secs, 'exit_reason': 'reverse_signal',
                             'session': self.classify_session(exit_time), 'index_when_exited': idx
                         })
+                        print(f"[Trade] {entry_date} {self.format_time(entry_time)} @ {entry_price:.0f} ({'Long' if position==1 else 'Short'}) -> {row['logdate']} {self.format_time(exit_time)} @ {display_price:.0f} | PnL: {pnl_points:+.0f} | Reason: reverse_signal")
                         equity_sum += pnl_points
                         equity.append({'idx': idx, 'equity': equity_sum})
                         if pnl_points < 0:
@@ -292,6 +369,7 @@ class FuturesBatchProcessorGUI:
                     position = signal
                     entry_price = display_price
                     entry_time = display_record['mattime']
+                    entry_date = row['logdate']
                     entry_day_high = current_day_high
                     entry_day_low = current_day_low
 
@@ -309,6 +387,7 @@ class FuturesBatchProcessorGUI:
                 'holding_secs': None, 'exit_reason': 'end_of_data',
                 'session': self.classify_session(last_time), 'index_when_exited': len(df)-1
             })
+            print(f"[Trade] {entry_date} {self.format_time(entry_time)} @ {entry_price:.0f} ({'Long' if position==1 else 'Short'}) -> {last_row['logdate']} {self.format_time(last_time)} @ {last_price:.0f} | PnL: {pnl_points:+.0f} | Reason: end_of_data")
             equity_sum += pnl_points
             equity.append({'idx': len(df)-1, 'equity': equity_sum})
             if pnl_points < 0:
@@ -372,11 +451,8 @@ class FuturesBatchProcessorGUI:
             for k,v in stats.items():
                 f.write(f"{k}: {v}\n")
 
-        zip_path = base + ".zip"
-        with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
-            for fname in [trades_csv, trades_xlsx, equity_png, summary_txt, stats_csv]:
-                if os.path.exists(fname):
-                    zf.write(fname, arcname=os.path.basename(fname))
+            for k,v in stats.items():
+                f.write(f"{k}: {v}\n")
 
         # print summary to console
         total_pnl = equity_sum
@@ -404,7 +480,7 @@ class FuturesBatchProcessorGUI:
             'equity_png': equity_png,
             'summary_txt': summary_txt,
             'stats_csv': stats_csv,
-            'zip': zip_path
+            'stats_csv': stats_csv
         }
 
     def _max_consecutive_losses(self, pnl_list):
@@ -423,9 +499,9 @@ def main():
     try:
         root_dir, start_dt, end_dt = app.choose_root_and_range()
         files = app.gather_files(root_dir, start_dt, end_dt)
-        out = app.process(root_dir, files, output_dir=root_dir)
+        out = app.process(root_dir, files, output_dir=os.getcwd())
         root = tk.Tk(); root.withdraw()
-        messagebox.showinfo("完成", f"結果已輸出到：\n{out['zip']}")
+        messagebox.showinfo("完成", f"結果已輸出到：\n{os.path.dirname(out['summary_txt'])}")
         print("輸出檔案：")
         for k,v in out.items():
             print(f"{k}: {v}")
