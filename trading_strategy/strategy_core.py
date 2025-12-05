@@ -146,6 +146,8 @@ class TradingStrategy:
         self.list_temp_tickbars_big_price = []         # 每根 tickbar 的區間最高價列表
         self.list_temp_tickbars_small_price = []       # 每根 tickbar 的區間最低價列表
         self.list_temp_tickbars_avg_price = []         # 每根 tickbar 的區間均價列表
+        self.list_temp_howeverHighest_avg_price = []   # 每根 tickbar 的日高附近平均價列表
+        self.list_temp_howeverLowest_avg_price = []    # 每根 tickbar 的日低附近平均價列表
 
         # 6) 區間比較資料（當前尚未結束的這一段）
         self.temp_price_compare_database: Dict = {}  # 暫存目前這一個區間內的 high/low 等資訊
@@ -495,11 +497,11 @@ class TradingStrategy:
 
         # ===== 7) 累積「然而平均」：頭部 / 底部的成交平均價 =====
         # 沒有空單訊號時才繼續累積高檔「然而平均」
-        if not self.order.sell_signal:
-            self._accumulate_however_high()
+        # if not self.order.sell_signal:
+        self._accumulate_however_high()
         # 沒有多單訊號時才繼續累積低檔「然而平均」
-        if not self.order.buy_signal:
-            self._accumulate_however_low()
+        # if not self.order.buy_signal:
+        self._accumulate_however_low()
 
         # ===== 8) group 門檻檢查：是否形成一根 tickbar =====
         try:
@@ -614,6 +616,10 @@ class TradingStrategy:
             self.temp_tickbars_total_volume)
         self.list_temp_tickbars_avg_price.append(
             int(self.temp_tickbars_avg_price))
+        self.list_temp_howeverHighest_avg_price.append(
+            int(self.temp_howeverHighest_avg_price))
+        self.list_temp_howeverLowest_avg_price.append(
+            int(self.temp_howeverLowest_avg_price))
 
         # 更新 GUI 的當前區間量與均價
         self.frame.compareInfoGrid.SetCellValue(
@@ -728,11 +734,21 @@ class TradingStrategy:
                 for s in self.fibonacci_sell_str.split(":")
                 if s.strip().isdigit()
             ]
+
+            # ===== 作多進場訊號：作多等回檔，使用 Fibonacci 階作為貼齊進場價 =====
+            buy_levels = [
+                int(s.strip())
+                for s in self.fibonacci_buy_str.split(":")
+                if s.strip().isdigit()
+            ]
+
             if (
                 self.suspected_sell
                 and temp_highest_arrow == "↓"
                 and len(sell_levels) > 3
                 and sell_levels[2] > self.temp_howeverHighest_avg_price
+                and buy_levels[2] < self.temp_howeverLowest_avg_price
+                and self.temp_howeverHighest_avg_price > self.temp_tickbars_avg_price
                 and not getattr(self.order, "trading_sell", False)
             ):
                 # 符合放空訊號條件：把顏色切成綠底白字（代表空方）
@@ -744,19 +760,25 @@ class TradingStrategy:
                 base_value = int(self.temp_howeverHighest_avg_price)
                 # 找出所有 ≥ base_value 的 Fib 價位
                 greater_or_equal_levels = [lvl for lvl in sell_levels if lvl > base_value]
+                
+                ref_price_for_index = 0
                 if greater_or_equal_levels:
                     # 最接近、但不小於 base_value 的 Fib 階
-                    trigger_price = min(greater_or_equal_levels)
+                    # trigger_price = min(greater_or_equal_levels)
+                    trigger_price = int((self.temp_howeverHighest_avg_price + self.temp_tickbars_avg_price) / 2)
+                    ref_price_for_index = min(greater_or_equal_levels)
                 else:
                     # 如果平均價已經高於所有 Fib 階，就用最大那一階
                     trigger_price = sell_levels[-1]
+                    ref_price_for_index = sell_levels[-1]
 
                 # ===== 2. stop_loss：trigger_price 往上二階 =====
-                tp_index = sell_levels.index(trigger_price)
+                tp_index = sell_levels.index(ref_price_for_index)
                 stop_index = tp_index + 2
 
                 if stop_index < len(sell_levels):
-                    stop_loss = sell_levels[stop_index]
+                    # stop_loss = sell_levels[stop_index]
+                    stop_loss = max(self.list_temp_howeverHighest_avg_price)
                 else:
                     # 如果沒有第二階可用，回退到原始邏輯
                     stop_loss = self.highest_price + 1
@@ -774,17 +796,13 @@ class TradingStrategy:
                 self.fibonacci_chkSell_str = self.fibonacci_sell_str
                 self.suspected_sell = False  # 本次頭部訊號已處理完，重置旗標
 
-            # ===== 作多進場訊號：作多等回檔，使用 Fibonacci 階作為貼齊進場價 =====
-            buy_levels = [
-                int(s.strip())
-                for s in self.fibonacci_buy_str.split(":")
-                if s.strip().isdigit()
-            ]
             if (
                 self.suspected_buy
                 and temp_lowest_arrow == "↑"
                 and len(buy_levels) > 3
-                and int(buy_levels[2]) < self.temp_howeverLowest_avg_price
+                and buy_levels[2] < self.temp_howeverLowest_avg_price
+                and sell_levels[2] > self.temp_howeverHighest_avg_price
+                and self.temp_howeverLowest_avg_price < self.temp_tickbars_avg_price
                 and not getattr(self.order, "trading_buy", False)
             ):
                 mark_temp_close_price_color = "Fore.WHITE + Style.BRIGHT + Back.RED"
@@ -796,19 +814,24 @@ class TradingStrategy:
                 # 找出所有「小於等於平均最低價」的階層（因為等回檔往下）
                 lower_or_equal_levels = [lvl for lvl in buy_levels if lvl < base_value]
 
+                ref_price_for_index = 0
                 if lower_or_equal_levels:
                     # 取最大（離 base_value 最近，但不高於 base_value）
-                    trigger_price = max(lower_or_equal_levels)
+                    # trigger_price = max(lower_or_equal_levels)
+                    trigger_price = int((self.temp_howeverLowest_avg_price + self.temp_tickbars_avg_price) / 2)
+                    ref_price_for_index = max(lower_or_equal_levels)
                 else:
                     # 如果平均價比最淺回檔還高，就用「最下面那階」（buy_levels 是由大到小，因此最後一個是最低價）
                     trigger_price = buy_levels[-1]
+                    ref_price_for_index = buy_levels[-1]
 
                 # ===== 2. 停損：從 trigger_price 往下二階 =====
-                tp_index = buy_levels.index(trigger_price)
+                tp_index = buy_levels.index(ref_price_for_index)
                 stop_index = tp_index + 2  # 注意：buy_levels 由大到小，往下二階 → index + 2
 
                 if stop_index < len(buy_levels):
-                    stop_loss = buy_levels[stop_index]
+                    # stop_loss = buy_levels[stop_index]
+                    stop_loss = min(self.list_temp_howeverLowest_avg_price)
                 else:
                     # 沒有更低的兩階，就退回原本邏輯
                     stop_loss = self.lowest_price - 1
@@ -899,11 +922,13 @@ class TradingStrategy:
             self.temp_TXF_MXF_howeverHighest = 0
             self.temp_howeverHighest_avg_price = 0
             self.fibonacci_chkSell_str = "0"  # 目前空單使用的 Fibonacci 字串
+            self.list_temp_howeverHighest_avg_price = []
         else:
             self.temp_howeverLowest_total_volume = 0
             self.temp_TXF_MXF_howeverLowest = 0
             self.temp_howeverLowest_avg_price = 0
             self.fibonacci_chkBuy_str = "0"   # 目前多單使用的 Fibonacci 字串
+            self.list_temp_howeverLowest_avg_price = []
 
     def _accumulate_however_high(self) -> None:
         """

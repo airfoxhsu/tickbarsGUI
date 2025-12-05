@@ -2088,7 +2088,7 @@ def load_json(fpath):
 
 
 if __name__ == "__main__":
-    APP_VERSION = "V1.1.2"
+    APP_VERSION = "V1.1.5"
     today = datetime.now().strftime("%Y-%m-%d")
     app = MyApp()
     frame = AppFrame(None, title=f'千金交易系統  {APP_VERSION}  ({today})', size=(1260, 850))

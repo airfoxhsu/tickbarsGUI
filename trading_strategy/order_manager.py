@@ -548,7 +548,7 @@ class OrderManager:
         """
         # ---- 放空止損 ----
         if getattr(self, "trading_sell", False) and getattr(self, "stopLoss_sell", 0):
-            if price >= self.stopLoss_sell:
+            if price > self.stopLoss_sell:
                 msg = f"{match_time} 🟥 空單觸發止損價 {self.stopLoss_sell}，執行平倉"
                 self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
                 self.trading_sell = False
@@ -570,7 +570,7 @@ class OrderManager:
 
         # ---- 作多止損 ----
         if getattr(self, "trading_buy", False) and getattr(self, "stopLoss_buy", 0):
-            if price <= self.stopLoss_buy:
+            if price < self.stopLoss_buy:
                 msg = f"{match_time} 🟥 多單觸發止損價 {self.stopLoss_buy}，執行平倉"
                 self.notifier.log(msg, Fore.YELLOW + Style.BRIGHT)
                 self.trading_buy = False
